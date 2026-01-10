@@ -21,3 +21,4 @@ Quickgoal is a web app to capture short-term and long-term goals with:
 ## Docs
 - Implementation plan: `docs/PLAN.md`
 - Milestones checklist: `MILESTONES.md`
+- features:
