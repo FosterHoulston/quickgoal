@@ -2,7 +2,7 @@
 Minimalist goal-tracking web app for short-term and long-term goals.
 
 ## Product summary
-Quickgoal is a web app to capture short-term and long-term goals with:
+Quickgoal is a web app to capture short-term goals with:
 - Automatic timestamping when the user starts typing a goal.
 - Optional duration and end-datetime inputs that appear when toggled on.
 - Multi-select goal categories.
@@ -16,7 +16,6 @@ Quickgoal is a web app to capture short-term and long-term goals with:
 ## Auth plan
 - Google sign-in (OAuth/OIDC)
 - Email sign-in (magic link or email+password)
-- Apple sign-in is optional and requires a paid Apple developer account
 
 ## Docs
 - Implementation plan: `docs/PLAN.md`
