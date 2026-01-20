@@ -21,3 +21,10 @@ Quickgoal is a web app to capture short-term and long-term goals with:
 ## Docs
 - Implementation plan: `docs/PLAN.md`
 - Milestones checklist: `MILESTONES.md`
+
+## Development
+- `npm install`: install dependencies
+- `npm run dev`: start local dev server
+- `npm run build`: build for production
+- `npm run start`: run the production build locally
+- `npm run lint`: run lint checks
