@@ -27,5 +27,10 @@ Quickgoal is a web app to capture short-term goals with:
 - `npm run build`: build for production
 - `npm run start`: run the production build locally
 - `npm run lint`: run lint checks
+
+## Supabase setup
+- Run `supabase/schema.sql` to create tables.
+- Run `supabase/policies.sql` to enable RLS and policies.
+- Run `supabase/seed.sql` to seed categories.
 =======
 - features:
