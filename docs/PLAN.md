@@ -3,14 +3,14 @@
 ## Goals
 - Capture short-term and long-term goals with minimal friction.
 - Timestamp the goal when the user starts typing.
-- Reveal duration and end-datetime fields only when toggled on.
+- Reveal end-datetime only when toggled on.
 - Support multi-select goal categories.
 - Keep the UI minimal, clean, and fast.
 
 ## User flow
 1. User signs in with Google or email.
 2. User starts typing a goal, which sets the timestamp.
-3. User optionally toggles duration and/or end-datetime, and fills the fields.
+3. User optionally toggles end-datetime and fills the field.
 4. User selects one or more categories.
 5. User saves the goal and sees it in the list.
 
@@ -27,7 +27,6 @@
 - title (text)
 - term (enum: short | long)
 - created_at (timestamp)
-- duration_minutes (int, nullable)
 - end_at (timestamp, nullable)
 
 ### categories
@@ -45,7 +44,6 @@
 
 ## UI behavior
 - Short/long toggle sets `term`.
-- Duration toggle shows a duration input when enabled.
 - End-datetime toggle shows a datetime picker when enabled.
 - Category multi-select shows tags/chips for selected categories.
 

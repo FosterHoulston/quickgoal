@@ -4,7 +4,7 @@ Minimalist goal-tracking web app for short-term and long-term goals.
 ## Product summary
 Quickgoal is a web app to capture short-term goals with:
 - Automatic timestamping when the user starts typing a goal.
-- Optional duration and end-datetime inputs that appear when toggled on.
+- Optional end-datetime inputs that appear when toggled on.
 - Multi-select goal categories.
 - Simple, clean UI focused on fast entry and review.
 
@@ -32,5 +32,3 @@ Quickgoal is a web app to capture short-term goals with:
 - Run `supabase/schema.sql` to create tables.
 - Run `supabase/policies.sql` to enable RLS and policies.
 - Run `supabase/seed.sql` to seed categories.
-=======
-- features:

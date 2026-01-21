@@ -21,14 +21,13 @@
 ## 4. Goal creation
 - [ ] Build goal input with timestamp-on-first-keystroke behavior.
 - [ ] Add short/long term toggle.
-- [ ] Add duration toggle and input.
 - [ ] Add end-datetime toggle and input.
 - [ ] Add category multi-select.
 - [ ] Save goals to Supabase.
 
 ## 5. Goal list
 - [ ] List saved goals by most recent.
-- [ ] Show term, timestamp, duration, end-datetime, categories.
+- [ ] Show term, timestamp, end-datetime, categories.
 - [ ] Add empty state for no goals.
 
 ## 6. Polish and validation

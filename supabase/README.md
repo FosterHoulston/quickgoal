@@ -9,6 +9,8 @@ Run these in the Supabase SQL editor in order:
 1. `supabase/schema.sql`
 2. `supabase/policies.sql`
 3. `supabase/seed.sql`
+4. `supabase/migrations/20250120_add_goal_outcome.sql` (if upgrading an existing DB)
+5. `supabase/migrations/20250120_remove_duration.sql` (if upgrading an existing DB)
 
 ## 3. Configure Auth providers
 - Enable Google provider.
