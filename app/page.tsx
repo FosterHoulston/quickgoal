@@ -2,7 +2,37 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/lib/supabaseClient";
+import {
+  FolderKanban,
+  Info,
+  LayoutDashboard,
+  Settings,
+  Tag,
+  User,
+} from "lucide-react";
 
 type Goal = {
   id: string;
@@ -56,6 +86,109 @@ const hasEnded = (endAt?: string, now = Date.now()) => {
   return now >= endTime;
 };
 
+type HeatmapCell = {
+  key: string;
+  label: string;
+  passCount: number;
+  failCount: number;
+};
+
+const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
+
+const buildDailyGrid = (goals: Goal[], year: number) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31);
+  const start = new Date(yearStart);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(yearEnd);
+  end.setDate(end.getDate() + (6 - end.getDay()));
+
+  const days: HeatmapCell[] = [];
+  const map = new Map<string, HeatmapCell>();
+  goals.forEach((goal) => {
+    if (!goal.outcome) return;
+    const date = new Date(goal.createdAt);
+    if (Number.isNaN(date.getTime())) return;
+    if (date.getFullYear() !== year) return;
+    date.setHours(0, 0, 0, 0);
+    const key = formatDateKey(date);
+    const existing = map.get(key) ?? {
+      key,
+      label: date.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      passCount: 0,
+      failCount: 0,
+    };
+    if (goal.outcome === "passed") {
+      existing.passCount += 1;
+    } else {
+      existing.failCount += 1;
+    }
+    map.set(key, existing);
+  });
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const key = formatDateKey(d);
+    days.push(
+      map.get(key) ?? {
+        key,
+        label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        passCount: 0,
+        failCount: 0,
+      },
+    );
+  }
+
+  const weeks: (HeatmapCell | null)[][] = [];
+  const weekStartDates: Date[] = [];
+  const monthFirstWeekIndex = new Map<number, number>();
+  let maxTotal = 0;
+  days.forEach((cell, index) => {
+    const weekIndex = Math.floor(index / 7);
+    if (!weeks[weekIndex]) {
+      weeks[weekIndex] = [];
+      const weekStart = new Date(start);
+      weekStart.setDate(start.getDate() + weekIndex * 7);
+      weekStartDates[weekIndex] = weekStart;
+    }
+    weeks[weekIndex].push(cell);
+    const total = cell.passCount + cell.failCount;
+    if (total > maxTotal) maxTotal = total;
+
+    const date = new Date(cell.key);
+    if (date >= yearStart && date <= yearEnd && !monthFirstWeekIndex.has(date.getMonth())) {
+      monthFirstWeekIndex.set(date.getMonth(), weekIndex);
+    }
+  });
+
+  weeks.forEach((week) => {
+    week.forEach((cell, index) => {
+      if (!cell) return;
+      const date = new Date(cell.key);
+      if (date < yearStart || date > yearEnd) {
+        week[index] = null;
+      }
+    });
+  });
+
+  const monthLabels: { index: number; label: string }[] = [];
+  for (let month = 0; month < 12; month += 1) {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    const weekIndex = weekStartDates.findIndex(
+      (date) => date >= monthStart && date <= monthEnd,
+    );
+    if (weekIndex === -1) continue;
+    monthLabels.push({
+      index: weekIndex,
+      label: monthStart.toLocaleDateString(undefined, { month: "short" }),
+    });
+  }
+
+  return { weeks, monthLabels, maxTotal };
+};
+
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -74,15 +207,20 @@ export default function Home() {
   const [goalsLoading, setGoalsLoading] = useState(false);
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [newGoalOpen, setNewGoalOpen] = useState(false);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editTerm, setEditTerm] = useState<"short" | "long">("short");
+  const [editOutcome, setEditOutcome] = useState<"passed" | "failed" | null>(
+    null,
+  );
   const [editHasEndAt, setEditHasEndAt] = useState(false);
   const [editEndAt, setEditEndAt] = useState("");
   const [editSelectedCategories, setEditSelectedCategories] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editDeleting, setEditDeleting] = useState(false);
   const [clockTick, setClockTick] = useState(Date.now());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const isAuthed = !!session;
   const canSave = title.trim().length > 0 && isAuthed;
@@ -264,6 +402,22 @@ export default function Home() {
   };
 
   const orderedGoals = useMemo(() => goals, [goals]);
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    orderedGoals.forEach((goal) => {
+      const date = new Date(goal.createdAt);
+      if (!Number.isNaN(date.getTime())) {
+        years.add(date.getFullYear());
+      }
+    });
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => b - a);
+  }, [orderedGoals]);
+
+  const dailyGrid = useMemo(
+    () => buildDailyGrid(orderedGoals, selectedYear),
+    [orderedGoals, selectedYear],
+  );
 
   const handleOutcome = async (goalId: string, nextOutcome: "passed" | "failed") => {
     setGoalsError(null);
@@ -293,6 +447,7 @@ export default function Home() {
     setEditGoal(goal);
     setEditTitle(goal.title);
     setEditTerm(goal.term);
+    setEditOutcome(goal.outcome ?? null);
     setEditHasEndAt(!!goal.endAt);
     setEditEndAt(toLocalInputValue(goal.endAt));
     if (goal.categoryIds && goal.categoryIds.length > 0) {
@@ -312,6 +467,7 @@ export default function Home() {
     setEditGoal(null);
     setEditTitle("");
     setEditTerm("short");
+    setEditOutcome(null);
     setEditHasEndAt(false);
     setEditEndAt("");
     setEditSelectedCategories([]);
@@ -337,6 +493,7 @@ export default function Home() {
       .update({
         title: editTitle.trim(),
         term: editTerm,
+        outcome: editOutcome,
         end_at: endAtValue,
       })
       .eq("id", editGoal.id);
@@ -386,6 +543,7 @@ export default function Home() {
               ...goal,
               title: editTitle.trim(),
               term: editTerm,
+              outcome: editOutcome ?? undefined,
               endAt: endAtValue ?? undefined,
               categories: updatedCategoryNames,
               categoryIds: editSelectedCategories,
@@ -470,380 +628,513 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen px-6 py-12 text-[15px] text-[#1a1a1a]">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <header className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[#6b6b6b]">
-            <span className="rounded-full border border-[#e6e0d8] px-3 py-1">
-              Quickgoal
-            </span>
-            <span>Capture the moment, build momentum.</span>
-          </div>
-          <h1 className="max-w-3xl font-[var(--font-fraunces)] text-4xl leading-tight text-[#1a1a1a] md:text-5xl">
-            A calm space for short and long-term goals — with timestamps that
-            start the instant you begin.
-          </h1>
-        </header>
-
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="rounded-3xl border border-[#e6e0d8] bg-white/90 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Sign in</h2>
-              <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                {session ? "Active" : "Required"}
+    <div className="h-screen overflow-hidden px-6 py-8 text-[15px] text-[#1a1a1a]">
+      <main className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5">
+        {!session ? (
+          <header className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[#6b6b6b]">
+              <span className="rounded-full border border-[#e6e0d8] px-3 py-1">
+                Quickgoal
               </span>
+              <span>Capture the moment, build momentum.</span>
             </div>
-            <div className="mt-4 flex flex-col gap-4 text-sm text-[#3a3a3a]">
-              {!authReady ? (
+            <h1 className="max-w-3xl font-[var(--font-fraunces)] text-3xl leading-tight text-[#1a1a1a] md:text-4xl">
+              A calm space for short and long-term goals — with timestamps that
+              start the instant you begin.
+            </h1>
+          </header>
+        ) : null}
+
+        {!session ? (
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <section className="rounded-3xl border border-[#e6e0d8] bg-white/90 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Sign in</h2>
                 <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                  Checking session...
+                  Required
                 </span>
-              ) : session ? (
-                <div className="flex flex-col gap-3">
-                  <span className="text-sm">
-                    Signed in as <strong>{session.user.email}</strong>
+              </div>
+              <p className="mt-2 text-sm text-[#6b6b6b]">
+                Sign in to access your goals dashboard and keep your progress synced.
+              </p>
+              <div className="mt-6 flex flex-col gap-4 text-sm text-[#3a3a3a]">
+                {!authReady ? (
+                  <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                    Checking session...
                   </span>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="rounded-full border border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a]"
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
+                    >
+                      Continue with Google
+                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleEmailSignIn}
+                        variant="outline"
+                        className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+                      >
+                        Email me a sign-in link
+                      </Button>
+                    </div>
+                  </>
+                )}
+                {authError ? (
+                  <span className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+                    {authError}
+                  </span>
+                ) : null}
+                {authNotice ? (
+                  <span className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-2 text-xs text-[#6b6b6b]">
+                    {authNotice}
+                  </span>
+                ) : null}
+                {!supabase ? (
+                  <span className="text-xs text-[#6b6b6b]">
+                    Add your Supabase env vars to enable auth.
+                  </span>
+                ) : null}
+              </div>
+            </section>
+            <section className="rounded-3xl border border-[#e6e0d8] bg-white/70 p-6">
+              <h2 className="text-lg font-semibold">Why Quickgoal?</h2>
+              <ul className="mt-4 space-y-3 text-sm text-[#6b6b6b]">
+                <li>Capture goals fast with instant timestamps.</li>
+                <li>Optional end dates keep you time-aware.</li>
+                <li>Track wins and misses in one calm space.</li>
+              </ul>
+            </section>
+          </div>
+        ) : (
+          <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[88px_1fr]">
+            <aside className="flex flex-col items-center gap-4 rounded-3xl border border-[#e6e0d8] bg-white/90 px-3 py-4 text-[#3a3a3a]">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#e6e0d8] bg-white text-xs font-semibold uppercase tracking-[0.2em]">
+                QG
+              </div>
+              <div className="mt-2 flex flex-col gap-3 text-[11px] uppercase tracking-[0.24em] text-[#6b6b6b]">
+                {[
+                  { label: "Dashboard", icon: LayoutDashboard },
+                  { label: "Categories", icon: Tag },
+                  { label: "Projects", icon: FolderKanban },
+                  { label: "Settings", icon: Settings },
+                  { label: "About", icon: Info },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const active = item.label === "Dashboard";
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                        active
+                          ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                          : "border-[#e6e0d8] text-[#6b6b6b] hover:border-[#2f6f6a]"
+                      }`}
+                      aria-label={item.label}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-auto">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e6e0d8] text-[#6b6b6b] hover:border-[#2f6f6a]"
+                      aria-label="Profile"
+                    >
+                      <User className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-56 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-xs text-[#3a3a3a]"
+                    align="start"
+                    side="right"
                   >
-                    Sign out
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <button
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-[#6b6b6b]">
+                      Profile
+                    </div>
+                    <div className="mt-2 text-sm font-semibold">
+                      {session.user.email}
+                    </div>
+                    <div className="mt-1 text-xs text-[#6b6b6b]">
+                      Signed in
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleSignOut}
+                      variant="outline"
+                      className="mt-4 w-full rounded-full border-[#1a1a1a] text-xs uppercase tracking-[0.18em] text-[#1a1a1a]"
+                    >
+                      Sign out
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </aside>
+
+            <div className="flex min-h-0 flex-col gap-4">
+              <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[#e6e0d8] bg-white/80 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Goals</h2>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                      {orderedGoals.length} total · open the form in a dialog
+                    </p>
+                  </div>
+                  <Button
                     type="button"
-                    onClick={handleGoogleSignIn}
+                    onClick={() => setNewGoalOpen(true)}
                     className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
                   >
-                    Continue with Google
-                  </button>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="you@example.com"
-                      className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#2f6f6a]"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleEmailSignIn}
-                      className="rounded-full border border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a]"
-                    >
-                      Email me a sign-in link
-                    </button>
+                    Create goal
+                  </Button>
+                </div>
+
+                <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#e6e0d8] bg-white">
+                  {goalsLoading ? (
+                    <div className="p-6 text-sm text-[#6b6b6b]">
+                      Loading goals...
+                    </div>
+                  ) : orderedGoals.length === 0 ? (
+                    <div className="p-6 text-sm text-[#6b6b6b]">
+                      {session
+                        ? "No goals yet. Use Create goal to add one."
+                        : "Sign in to view your goals."}
+                    </div>
+                  ) : (
+                    <div className="max-h-none flex-1 overflow-y-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-[#f7f5f1] text-[11px] uppercase tracking-[0.18em] text-[#6b6b6b]">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">Goal</th>
+                            <th className="px-4 py-3 font-medium">Term</th>
+                            <th className="px-4 py-3 font-medium">Started</th>
+                            <th className="px-4 py-3 font-medium">End</th>
+                            <th className="px-4 py-3 font-medium">Categories</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orderedGoals.map((goal) => (
+                            <tr
+                              key={goal.id}
+                              role="button"
+                              tabIndex={isAuthed ? 0 : -1}
+                              onClick={() => {
+                                if (!isAuthed) return;
+                                openEditGoal(goal);
+                              }}
+                              onKeyDown={(event) => {
+                                if (!isAuthed) return;
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  openEditGoal(goal);
+                                }
+                              }}
+                              aria-disabled={!isAuthed}
+                              className={`border-t border-[#f1f0ec] align-top transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
+                                goal.outcome === "passed"
+                                  ? "bg-[#e7f1ef] hover:bg-[#dbe9e6]"
+                                  : goal.outcome === "failed"
+                                    ? "bg-[#f3e6e2] hover:bg-[#ecd9d2]"
+                                    : "hover:bg-[#fbfaf8]"
+                              }`}
+                            >
+                              <td className="px-4 py-4 text-[#1a1a1a]">
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2 font-semibold">
+                                    {goal.outcome === "passed" ? (
+                                      <span className="text-[#2f6f6a]" aria-hidden="true">
+                                        ✓
+                                      </span>
+                                    ) : goal.outcome === "failed" ? (
+                                      <span className="text-[#8b4a3a]" aria-hidden="true">
+                                        x
+                                      </span>
+                                    ) : null}
+                                    <span>{goal.title}</span>
+                                  </div>
+                                  {!goal.outcome ? (
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                      <Button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleOutcome(goal.id, "passed");
+                                        }}
+                                        disabled={!isAuthed}
+                                        variant="outline"
+                                        className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        Pass
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleOutcome(goal.id, "failed");
+                                        }}
+                                        disabled={!isAuthed}
+                                        variant="outline"
+                                        className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                      >
+                                        Fail
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 text-xs uppercase tracking-[0.18em] text-[#6b6b6b]">
+                                {goal.term}
+                              </td>
+                              <td className="px-4 py-4 text-xs text-[#6b6b6b]">
+                                {formatTimestamp(goal.createdAt)}
+                              </td>
+                              <td className="px-4 py-4 text-xs text-[#6b6b6b]">
+                                {goal.endAt ? (
+                                  <div className="flex flex-col gap-2">
+                                    <span>{formatTimestamp(goal.endAt)}</span>
+                                    {hasEnded(goal.endAt, clockTick) ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="w-fit rounded-full border-[#1a1a1a] bg-[#1a1a1a] px-3 py-1 uppercase tracking-[0.14em] text-white"
+                                      >
+                                        Ended
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <span className="text-[#b7b1a9]">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  {goal.categories.length > 0 ? (
+                                    goal.categories.map((category) => (
+                                      <Badge
+                                        key={`${goal.id}-${category}`}
+                                        variant="outline"
+                                        className="rounded-full border-transparent bg-[#f1f0ec] px-3 py-1 uppercase tracking-[0.14em] text-[#3a3a3a]"
+                                      >
+                                        {category}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-[#b7b1a9]">—</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-[#e6e0d8] bg-white/90 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold">Goal outcomes</h3>
                   </div>
-                </>
-              )}
-              {authError ? (
-                <span className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
-                  {authError}
-                </span>
-              ) : null}
-              {authNotice ? (
-                <span className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-2 text-xs text-[#6b6b6b]">
-                  {authNotice}
-                </span>
-              ) : null}
-              {!supabase ? (
-                <span className="text-xs text-[#6b6b6b]">
-                  Add your Supabase env vars to enable auth.
-                </span>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-[#e6e0d8] bg-white/80 p-6 shadow-[0_20px_50px_-35px_rgba(0,0,0,0.4)] backdrop-blur">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">New goal</h2>
-              {draftStartedAt ? (
-                <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                  Started {formatTimestamp(draftStartedAt)}
-                </span>
-              ) : (
-                <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                  Start typing to timestamp
-                </span>
-              )}
-            </div>
-
-            <div className="mt-6 flex flex-col gap-5">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-[#3a3a3a]">
-                  Goal
-                </span>
-                <input
-                  value={title}
-                  onChange={(event) => handleTitleChange(event.target.value)}
-                  placeholder="Write a clear, short goal..."
-                  disabled={!isAuthed}
-                  className="w-full rounded-2xl border border-[#e6e0d8] bg-white px-4 py-3 text-base shadow-sm outline-none transition focus:border-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#f1f0ec]"
-                />
-              </label>
-
-              <div className="flex flex-col gap-3">
-                <span className="text-sm font-medium text-[#3a3a3a]">
-                  Term
-                </span>
-                <div className="flex gap-3">
-                  {(["short", "long"] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setTerm(value)}
-                      aria-pressed={term === value}
-                      disabled={!isAuthed}
-                      className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                        term === value
-                          ? "border-[#2f6f6a] bg-[#2f6f6a] text-white"
-                          : "border-[#e6e0d8] bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
-                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                  <div className="flex justify-center">
+                    <Select
+                      value={String(selectedYear)}
+                      onValueChange={(value) => setSelectedYear(Number(value))}
                     >
-                      {value === "short" ? "Short term" : "Long term"}
-                    </button>
-                  ))}
+                      <SelectTrigger className="h-9 w-[88px] justify-center rounded-full border-[#1a1a1a]/20 px-2 text-xs uppercase tracking-[0.2em]">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableYears.map((year) => (
+                          <SelectItem key={year} value={String(year)}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setHasEndAt((value) => !value)}
-                    aria-pressed={hasEndAt}
-                    disabled={!isAuthed}
-                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                      hasEndAt
-                        ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
-                        : "border-[#e6e0d8] bg-white text-[#3a3a3a]"
-                    } disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    <span>End date/time</span>
-                    <span className="text-xs uppercase tracking-[0.2em]">
-                      {hasEndAt ? "On" : "Off"}
-                    </span>
-                  </button>
-                  {hasEndAt ? (
-                    <input
-                      type="datetime-local"
-                      value={endAt}
-                      onChange={(event) => setEndAt(event.target.value)}
-                      disabled={!isAuthed}
-                      className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#f1f0ec]"
-                    />
-                  ) : null}
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <span className="text-sm font-medium text-[#3a3a3a]">
-                  Categories
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((category) => {
-                    const selected = selectedCategories.includes(category.id);
-                    return (
-                      <button
-                        key={category.id}
-                        type="button"
-                        onClick={() => toggleCategory(category.id)}
-                        aria-pressed={selected}
-                        disabled={!isAuthed}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
-                          selected
-                            ? "border-[#2f6f6a] bg-[#2f6f6a] text-white"
-                            : "border-[#e6e0d8] bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
-                        } disabled:cursor-not-allowed disabled:opacity-60`}
-                      >
-                        {category.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={!canSave}
-                  className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#b7b1a9]"
-                >
-                  Save goal
-                </button>
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="rounded-full border border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a]"
-                >
-                  Clear
-                </button>
-                <span className="text-xs text-[#6b6b6b]">
-                  {session
-                    ? "Goals are timestamped on first input."
-                    : "Sign in to save goals."}
-                </span>
-                {saveNotice ? (
-                  <span className="text-xs text-[#2f6f6a]">{saveNotice}</span>
-                ) : null}
-                {goalsError ? (
-                  <span className="text-xs text-red-600">{goalsError}</span>
-                ) : null}
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-3xl border border-[#e6e0d8] bg-white/70 p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Recent goals</h2>
-              <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                {orderedGoals.length} total
-              </span>
-            </div>
-            <div className="mt-6 flex flex-col gap-4">
-              {goalsLoading ? (
-                <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
-                  Loading goals...
-                </div>
-              ) : orderedGoals.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
-                  {session
-                    ? "No goals yet. Add one on the left to see it here."
-                    : "Sign in to view your goals."}
-                </div>
-              ) : (
-                orderedGoals.map((goal) => (
-                  <div
-                    key={goal.id}
-                    role="button"
-                    tabIndex={isAuthed ? 0 : -1}
-                    onClick={() => {
-                      if (!isAuthed) return;
-                      openEditGoal(goal);
-                    }}
-                    onKeyDown={(event) => {
-                      if (!isAuthed) return;
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openEditGoal(goal);
-                      }
-                    }}
-                    aria-disabled={!isAuthed}
-                    className="text-left rounded-2xl border border-[#e6e0d8] bg-white p-4 shadow-sm transition hover:border-[#2f6f6a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="text-base font-semibold">{goal.title}</h3>
-                      <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                        {goal.term} term
-                      </span>
+                <div className="mt-4">
+                  {dailyGrid.weeks.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                      No completed goals yet. Mark a goal as passed or failed to see
+                      progress.
                     </div>
-                    <div className="mt-2 text-xs text-[#6b6b6b]">
-                      Started {formatTimestamp(goal.createdAt)}
-                    </div>
-                    {!goal.outcome ? (
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        <span className="text-[#6b6b6b]">Mark outcome:</span>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOutcome(goal.id, "passed");
-                          }}
-                          disabled={!isAuthed}
-                          className="rounded-full border border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Passed
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOutcome(goal.id, "failed");
-                          }}
-                          disabled={!isAuthed}
-                          className="rounded-full border border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Failed
-                        </button>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-[auto_1fr] gap-3">
+                        <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
+                          {["Mon", "Wed", "Fri"].map((day, index) => (
+                            <span
+                              key={day}
+                              className="h-3 leading-3"
+                              style={{ gridRowStart: 2 + index * 2 }}
+                            >
+                              {day}
+                            </span>
+                          ))}
+                        </div>
+                        <div>
+                          <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
+                            {dailyGrid.monthLabels.map((label) => (
+                              <span
+                                key={`${label.index}-${label.label}`}
+                                style={{ gridColumnStart: label.index + 1 }}
+                              >
+                                {label.label}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
+                            {dailyGrid.weeks.map((week, weekIndex) => (
+                              <div key={`week-${weekIndex}`} className="grid gap-[6px]">
+                                {week.map((cell, dayIndex) => {
+                                  if (!cell) {
+                                    return (
+                                      <span
+                                        key={`empty-${weekIndex}-${dayIndex}`}
+                                        className="h-3 w-3 rounded-[4px]"
+                                      />
+                                    );
+                                  }
+                                  const total = cell.passCount + cell.failCount;
+                                  const passRatio = total > 0 ? cell.passCount / total : 0;
+                                  const intensity =
+                                    total === 0
+                                      ? 0
+                                      : Math.min(
+                                          1,
+                                          0.35 + total / Math.max(1, dailyGrid.maxTotal),
+                                        );
+                                  const green = `rgba(47, 179, 106, ${intensity})`;
+                                  const red = `rgba(227, 83, 63, ${intensity})`;
+                                  const background =
+                                    total === 0
+                                      ? "#f1f0ec"
+                                      : `linear-gradient(90deg, ${green} ${Math.round(
+                                          passRatio * 100,
+                                        )}%, ${red} ${Math.round(passRatio * 100)}%)`;
+                                  return (
+                                    <span
+                                      key={cell.key}
+                                      className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                      style={{ background }}
+                                      title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                      {goal.outcome ? (
-                        <span
-                          className={`rounded-full border px-3 py-1 uppercase tracking-[0.14em] ${
-                            goal.outcome === "passed"
-                              ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
-                              : "border-[#8b4a3a] bg-[#f3e6e2] text-[#8b4a3a]"
-                          }`}
-                        >
-                          {goal.outcome === "passed" ? "Passed" : "Failed"}
-                        </span>
-                      ) : null}
-                      {goal.endAt ? (
-                        <span
-                          className={`rounded-full border px-3 py-1 ${
-                            hasEnded(goal.endAt, clockTick)
-                              ? "border-[#1a1a1a] bg-[#1a1a1a] uppercase tracking-[0.14em] text-white"
-                              : "border-[#e6e0d8]"
-                          }`}
-                        >
-                          {hasEnded(goal.endAt, clockTick)
-                            ? `Ended ${formatTimestamp(goal.endAt)}`
-                            : `Ends ${formatTimestamp(goal.endAt)}`}
-                        </span>
-                      ) : null}
-                      {goal.categories.map((category) => (
-                        <span
-                          key={`${goal.id}-${category}`}
-                          className="rounded-full bg-[#f1f0ec] px-3 py-1 uppercase tracking-[0.14em] text-[#3a3a3a]"
-                        >
-                          {category}
-                        </span>
-                      ))}
+                      <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
+                        <div className="flex items-center gap-2">
+                          <span>Passed</span>
+                          <div className="flex items-center gap-2">
+                            {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
+                              const background =
+                                passRatio === 1
+                                  ? "#2fb36a"
+                                  : passRatio === 0
+                                    ? "#e3533f"
+                                    : `linear-gradient(90deg, #2fb36a ${Math.round(
+                                        passRatio * 100,
+                                      )}%, #e3533f ${Math.round(passRatio * 100)}%)`;
+                              return (
+                                <span
+                                  key={`pf-${index}`}
+                                  className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                  style={{ background }}
+                                />
+                              );
+                            })}
+                          </div>
+                          <span>Failed</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>Less</span>
+                          <div className="flex items-center gap-2">
+                            {[0, 0.35, 0.55, 0.75, 1].map((step) => (
+                              <span
+                                key={`legend-${step}`}
+                                className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                              style={{
+                                background:
+                                  step === 0
+                                    ? "#f1f0ec"
+                                    : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
+                              }}
+                            />
+                          ))}
+                        </div>
+                          <span>More</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  )}
+                </div>
+              </section>
             </div>
-          </section>
-        </div>
+          </div>
+        )}
       </main>
 
-      {editGoal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-10"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-2xl rounded-3xl border border-[#e6e0d8] bg-white p-6 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+      <Dialog
+        open={!!editGoal}
+        onOpenChange={(open) => {
+          if (!open) closeEditGoal();
+        }}
+      >
+        {editGoal ? (
+          <DialogContent
+            showCloseButton={false}
+            className="w-full max-w-2xl rounded-3xl border-[#e6e0d8] bg-white p-5 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]"
+          >
+            <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
               <div>
-                <h3 className="text-lg font-semibold">Edit goal</h3>
-                <p className="text-xs text-[#6b6b6b]">
+                <DialogTitle>Edit goal</DialogTitle>
+                <DialogDescription className="text-xs text-[#6b6b6b]">
                   Started {formatTimestamp(editGoal.createdAt)}
-                </p>
+                </DialogDescription>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={closeEditGoal}
-                className="rounded-full border border-[#e6e0d8] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#6b6b6b]"
+                variant="outline"
+                className="rounded-full border-[#e6e0d8] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#6b6b6b]"
               >
                 Close
-              </button>
-            </div>
+              </Button>
+            </DialogHeader>
 
-            <div className="mt-6 flex flex-col gap-5">
+            <div className="mt-2 flex flex-col gap-5">
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-[#3a3a3a]">Goal</span>
-                <input
+                <Input
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
                   placeholder="Update your goal..."
-                  className="w-full rounded-2xl border border-[#e6e0d8] bg-white px-4 py-3 text-base shadow-sm outline-none transition focus:border-[#2f6f6a]"
+                  className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-base shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
                 />
               </label>
 
@@ -851,45 +1142,81 @@ export default function Home() {
                 <span className="text-sm font-medium text-[#3a3a3a]">Term</span>
                 <div className="flex gap-3">
                   {(["short", "long"] as const).map((value) => (
-                    <button
+                    <Button
                       key={value}
                       type="button"
                       onClick={() => setEditTerm(value)}
                       aria-pressed={editTerm === value}
+                      variant="outline"
                       className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
                         editTerm === value
-                          ? "border-[#2f6f6a] bg-[#2f6f6a] text-white"
-                          : "border-[#e6e0d8] bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                          ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
+                          : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
                       }`}
                     >
                       {value === "short" ? "Short term" : "Long term"}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
 
               <div className="flex flex-col gap-3">
-                  <button
+                <span className="text-sm font-medium text-[#3a3a3a]">
+                  Outcome
+                </span>
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    onClick={() => setEditOutcome("passed")}
+                    aria-pressed={editOutcome === "passed"}
+                    variant="outline"
+                    className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
+                      editOutcome === "passed"
+                        ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
+                        : "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                    }`}
+                  >
+                    Pass
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setEditOutcome("failed")}
+                    aria-pressed={editOutcome === "failed"}
+                    variant="outline"
+                    className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
+                      editOutcome === "failed"
+                        ? "border-[#8b4a3a] bg-[#8b4a3a] text-white shadow-sm"
+                        : "border-[#8b4a3a] bg-[#f3e6e2] text-[#8b4a3a]"
+                    }`}
+                  >
+                    Fail
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                  <Button
                     type="button"
                     onClick={() => setEditHasEndAt((value) => !value)}
                     aria-pressed={editHasEndAt}
+                    variant="outline"
                     className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                       editHasEndAt
                         ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
-                        : "border-[#e6e0d8] bg-white text-[#3a3a3a]"
+                        : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a]"
                     }`}
                   >
                     <span>End date/time</span>
                     <span className="text-xs uppercase tracking-[0.2em]">
                       {editHasEndAt ? "On" : "Off"}
                     </span>
-                  </button>
+                  </Button>
                   {editHasEndAt ? (
-                    <input
+                    <Input
                       type="datetime-local"
                       value={editEndAt}
                       onChange={(event) => setEditEndAt(event.target.value)}
-                      className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#2f6f6a]"
+                      className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
                     />
                   ) : null}
               </div>
@@ -902,19 +1229,20 @@ export default function Home() {
                   {categories.map((category) => {
                     const selected = editSelectedCategories.includes(category.id);
                     return (
-                      <button
+                      <Button
                         key={category.id}
                         type="button"
                         onClick={() => toggleEditCategory(category.id)}
                         aria-pressed={selected}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                        variant="outline"
+                        className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                           selected
-                            ? "border-[#2f6f6a] bg-[#2f6f6a] text-white"
-                            : "border-[#e6e0d8] bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                            ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
+                            : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
                         }`}
                       >
                         {category.name}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -923,35 +1251,193 @@ export default function Home() {
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-3">
-                <button
+                <Button
                   type="button"
                   onClick={handleUpdateGoal}
                   disabled={editSaving || editTitle.trim().length === 0}
                   className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#b7b1a9]"
                 >
                   {editSaving ? "Saving..." : "Save changes"}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={closeEditGoal}
                   disabled={editSaving || editDeleting}
-                  className="rounded-full border border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a] disabled:cursor-not-allowed disabled:opacity-60"
+                  variant="outline"
+                  className="rounded-full border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={handleDeleteGoal}
                 disabled={editDeleting}
-                className="rounded-full border border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#8b4a3a] transition hover:border-[#8b4a3a] disabled:cursor-not-allowed disabled:opacity-60"
+                variant="outline"
+                className="rounded-full border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#8b4a3a] transition hover:border-[#8b4a3a] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {editDeleting ? "Deleting..." : "Delete goal"}
-              </button>
+              </Button>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={newGoalOpen}
+        onOpenChange={(open) => setNewGoalOpen(open)}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="w-full max-w-2xl rounded-3xl border-[#e6e0d8] bg-white p-5 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]"
+        >
+          <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
+            <div>
+              <DialogTitle>New goal</DialogTitle>
+              {draftStartedAt ? (
+                <DialogDescription className="text-xs text-[#6b6b6b]">
+                  Started {formatTimestamp(draftStartedAt)}
+                </DialogDescription>
+              ) : (
+                <DialogDescription className="text-xs text-[#6b6b6b]">
+                  Start typing to timestamp
+                </DialogDescription>
+              )}
+            </div>
+            <Button
+              type="button"
+              onClick={() => setNewGoalOpen(false)}
+              variant="outline"
+              className="rounded-full border-[#e6e0d8] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#6b6b6b]"
+            >
+              Close
+            </Button>
+          </DialogHeader>
+
+          <div className="mt-2 flex flex-col gap-5">
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-[#3a3a3a]">Goal</span>
+              <Input
+                value={title}
+                onChange={(event) => handleTitleChange(event.target.value)}
+                placeholder="Write a clear, short goal..."
+                disabled={!isAuthed}
+                className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-base shadow-sm transition focus-visible:ring-[#2f6f6a]/40 disabled:bg-[#f1f0ec]"
+              />
+            </label>
+
+            <div className="flex flex-col gap-3">
+              <span className="text-sm font-medium text-[#3a3a3a]">Term</span>
+              <div className="flex gap-3">
+                {(["short", "long"] as const).map((value) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    onClick={() => setTerm(value)}
+                    aria-pressed={term === value}
+                    disabled={!isAuthed}
+                    variant="outline"
+                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                      term === value
+                        ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
+                        : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    {value === "short" ? "Short term" : "Long term"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                onClick={() => setHasEndAt((value) => !value)}
+                aria-pressed={hasEndAt}
+                disabled={!isAuthed}
+                variant="outline"
+                className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                  hasEndAt
+                    ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                    : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a]"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <span>End date/time</span>
+                <span className="text-xs uppercase tracking-[0.2em]">
+                  {hasEndAt ? "On" : "Off"}
+                </span>
+              </Button>
+              {hasEndAt ? (
+                <Input
+                  type="datetime-local"
+                  value={endAt}
+                  onChange={(event) => setEndAt(event.target.value)}
+                  disabled={!isAuthed}
+                  className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40 disabled:bg-[#f1f0ec]"
+                />
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <span className="text-sm font-medium text-[#3a3a3a]">
+                Categories
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => {
+                  const selected = selectedCategories.includes(category.id);
+                  return (
+                    <Button
+                      key={category.id}
+                      type="button"
+                      onClick={() => toggleCategory(category.id)}
+                      aria-pressed={selected}
+                      disabled={!isAuthed}
+                      variant="outline"
+                      className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
+                        selected
+                          ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
+                          : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      {category.name}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!canSave}
+                className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#b7b1a9]"
+              >
+                Save goal
+              </Button>
+              <Button
+                type="button"
+                onClick={resetForm}
+                variant="outline"
+                className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+              >
+                Clear
+              </Button>
+              <span className="text-xs text-[#6b6b6b]">
+                {session
+                  ? "Goals are timestamped on first input."
+                  : "Sign in to save goals."}
+              </span>
+              {saveNotice ? (
+                <span className="text-xs text-[#2f6f6a]">{saveNotice}</span>
+              ) : null}
+              {goalsError ? (
+                <span className="text-xs text-red-600">{goalsError}</span>
+              ) : null}
             </div>
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
