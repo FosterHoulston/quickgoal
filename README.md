@@ -1,8 +1,8 @@
 # quickgoal
-Minimalist goal-tracking web app for short-term and long-term goals.
+Minimalist goal-tracking web app for fast goal capture.
 
 ## Product summary
-Quickgoal is a web app to capture short-term goals with:
+Quickgoal is a web app to capture goals with:
 - Automatic timestamping when the user starts typing a goal.
 - Optional end-datetime inputs that appear when toggled on.
 - Multi-select goal categories.

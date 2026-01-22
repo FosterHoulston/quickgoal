@@ -1,7 +1,7 @@
 # Quickgoal plan
 
 ## Goals
-- Capture short-term and long-term goals with minimal friction.
+- Capture goals with minimal friction.
 - Timestamp the goal when the user starts typing.
 - Reveal end-datetime only when toggled on.
 - Support multi-select goal categories.
@@ -25,7 +25,6 @@
 - id (uuid, pk)
 - user_id (uuid, fk -> auth.users)
 - title (text)
-- term (enum: short | long)
 - created_at (timestamp)
 - end_at (timestamp, nullable)
 
@@ -43,7 +42,6 @@
 - Optional upgrade later: create a draft row on first keystroke and update it live.
 
 ## UI behavior
-- Short/long toggle sets `term`.
 - End-datetime toggle shows a datetime picker when enabled.
 - Category multi-select shows tags/chips for selected categories.
 

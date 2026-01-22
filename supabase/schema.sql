@@ -1,5 +1,16 @@
-create type goal_term as enum ('short', 'long');
-create type goal_outcome as enum ('passed', 'failed');
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'goal_term') then
+    create type goal_term as enum ('short', 'long');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'goal_outcome') then
+    create type goal_outcome as enum ('passed', 'failed');
+  end if;
+end $$;
 
 create table if not exists public.goals (
   id uuid primary key default gen_random_uuid(),
@@ -13,8 +24,13 @@ create table if not exists public.goals (
 
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique
+  user_id uuid references auth.users(id) on delete cascade,
+  name text not null,
+  description text
 );
+
+create unique index if not exists categories_user_name_unique
+  on public.categories (user_id, name);
 
 create table if not exists public.goal_categories (
   goal_id uuid not null references public.goals(id) on delete cascade,

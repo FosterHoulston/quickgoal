@@ -1,9 +1,9 @@
-insert into public.categories (name) values
-  ('Health'),
-  ('Career'),
-  ('Learning'),
-  ('Finance'),
-  ('Relationships'),
-  ('Mindset'),
-  ('Creative')
-on conflict (name) do nothing;
+insert into public.categories (name, description) values
+  ('Health', null),
+  ('Career', null),
+  ('Learning', null),
+  ('Finance', null),
+  ('Relationships', null),
+  ('Mindset', null),
+  ('Creative', null)
+on conflict do nothing;

@@ -14,7 +14,7 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: "Quickgoal",
-  description: "Minimalist goal tracking for short-term and long-term goals.",
+  description: "Minimalist goal tracking for fast goal capture.",
 };
 
 export default function RootLayout({
