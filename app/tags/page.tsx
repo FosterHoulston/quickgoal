@@ -196,7 +196,7 @@ export default function TagsPage() {
 
   return (
     <AppShell sessionEmail={sessionEmail}>
-      <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[#e6e0d8] bg-white/90 p-6">
+      <section className="flex min-h-0 flex-1 flex-col">
         <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
           Tags
         </div>

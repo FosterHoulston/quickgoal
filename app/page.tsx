@@ -1,7 +1,7 @@
 "use client";
 
 import type { Session } from "@supabase/supabase-js";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -198,6 +198,12 @@ export default function Home() {
   const [toasts, setToasts] = useState<
     { id: string; message: string; tone?: "default" | "success" | "error" }[]
   >([]);
+  const [hoverCard, setHoverCard] = useState<{ id: string; top: number } | null>(
+    null,
+  );
+  const hoverTimeoutRef = useRef<number | null>(null);
+  const hoverHideTimeoutRef = useRef<number | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editOutcome, setEditOutcome] = useState<"passed" | "failed" | null>(
@@ -682,102 +688,133 @@ export default function Home() {
     }
   };
 
-  return (
-    <div className="h-screen overflow-hidden px-6 py-8 text-[15px] text-[#1a1a1a]">
-      <main className="mx-auto flex h-full w-full max-w-6xl flex-col gap-5">
-        {!session ? (
-          <header className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[#6b6b6b]">
-              <span className="rounded-full border border-[#e6e0d8] px-3 py-1">
-                Quickgoal
-              </span>
-              <span>Capture the moment, build momentum.</span>
-            </div>
-            <h1 className="max-w-3xl font-[var(--font-fraunces)] text-3xl leading-tight text-[#1a1a1a] md:text-4xl">
-              A calm space for goals — with timestamps that start the instant you
-              begin.
-            </h1>
-          </header>
-        ) : null}
+  const handleRowEnter = (goalId: string, target: HTMLTableRowElement) => {
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      const container = tableContainerRef.current;
+      if (container) {
+        const rowRect = target.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const top = rowRect.top - containerRect.top + container.scrollTop;
+        setHoverCard({ id: goalId, top });
+      } else {
+        setHoverCard({ id: goalId, top: 0 });
+      }
+    }, 500);
+  };
 
-        {!session ? (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <section className="rounded-3xl border border-[#e6e0d8] bg-white/90 p-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Sign in</h2>
-                <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                  Required
+  const handleRowLeave = () => {
+    if (hoverTimeoutRef.current) {
+      window.clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (hoverHideTimeoutRef.current) {
+      window.clearTimeout(hoverHideTimeoutRef.current);
+    }
+    hoverHideTimeoutRef.current = window.setTimeout(() => {
+      setHoverCard(null);
+    }, 150);
+  };
+
+  return (
+    <>
+      {!session ? (
+        <div className="min-h-screen px-6 py-8 text-[15px] text-[#1a1a1a]">
+          <main className="mx-auto flex w-full max-w-6xl flex-col gap-5">
+            <header className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[#6b6b6b]">
+                <span className="rounded-full border border-[#e6e0d8] px-3 py-1">
+                  Quickgoal
                 </span>
+                <span>Capture the moment, build momentum.</span>
               </div>
-              <p className="mt-2 text-sm text-[#6b6b6b]">
-                Sign in to access your goals dashboard and keep your progress synced.
-              </p>
-              <div className="mt-6 flex flex-col gap-4 text-sm text-[#3a3a3a]">
-                {!authReady ? (
+              <h1 className="max-w-3xl font-[var(--font-fraunces)] text-3xl leading-tight text-[#1a1a1a] md:text-4xl">
+                A calm space for goals — with timestamps that start the instant you
+                begin.
+              </h1>
+            </header>
+
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              <section className="rounded-2xl border border-[#e6e0d8] bg-white/90 p-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Sign in</h2>
                   <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                    Checking session...
+                    Required
                   </span>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      onClick={handleGoogleSignIn}
-                      className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
-                    >
-                      Continue with Google
-                    </Button>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                        Email
-                      </label>
-                      <Input
-                        type="email"
-                        value={email}
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="you@example.com"
-                        className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
-                      />
+                </div>
+                <p className="mt-2 text-sm text-[#6b6b6b]">
+                  Sign in to access your goals dashboard and keep your progress synced.
+                </p>
+                <div className="mt-6 flex flex-col gap-4 text-sm text-[#3a3a3a]">
+                  {!authReady ? (
+                    <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                      Checking session...
+                    </span>
+                  ) : (
+                    <>
                       <Button
                         type="button"
-                        onClick={handleEmailSignIn}
-                        variant="outline"
-                        className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+                        onClick={handleGoogleSignIn}
+                        className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
                       >
-                        Email me a sign-in link
+                        Continue with Google
                       </Button>
-                    </div>
-                  </>
-                )}
-                {authError ? (
-                  <span className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
-                    {authError}
-                  </span>
-                ) : null}
-                {authNotice ? (
-                  <span className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-2 text-xs text-[#6b6b6b]">
-                    {authNotice}
-                  </span>
-                ) : null}
-                {!supabase ? (
-                  <span className="text-xs text-[#6b6b6b]">
-                    Add your Supabase env vars to enable auth.
-                  </span>
-                ) : null}
-              </div>
-            </section>
-            <section className="rounded-3xl border border-[#e6e0d8] bg-white/70 p-6">
-              <h2 className="text-lg font-semibold">Why Quickgoal?</h2>
-              <ul className="mt-4 space-y-3 text-sm text-[#6b6b6b]">
-                <li>Capture goals fast with instant timestamps.</li>
-                <li>Optional end dates keep you time-aware.</li>
-                <li>Track wins and misses in one calm space.</li>
-              </ul>
-            </section>
-          </div>
-        ) : (
-          <AppShell embedded sessionEmail={session.user.email} onSignOut={handleSignOut}>
-            <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[#e6e0d8] bg-white/85 p-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                          Email
+                        </label>
+                        <Input
+                          type="email"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          placeholder="you@example.com"
+                          className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleEmailSignIn}
+                          variant="outline"
+                          className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+                        >
+                          Email me a sign-in link
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  {authError ? (
+                    <span className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+                      {authError}
+                    </span>
+                  ) : null}
+                  {authNotice ? (
+                    <span className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-2 text-xs text-[#6b6b6b]">
+                      {authNotice}
+                    </span>
+                  ) : null}
+                  {!supabase ? (
+                    <span className="text-xs text-[#6b6b6b]">
+                      Add your Supabase env vars to enable auth.
+                    </span>
+                  ) : null}
+                </div>
+              </section>
+              <section className="rounded-2xl border border-[#e6e0d8] bg-white/70 p-6">
+                <h2 className="text-lg font-semibold">Why Quickgoal?</h2>
+                <ul className="mt-4 space-y-3 text-sm text-[#6b6b6b]">
+                  <li>Capture goals fast with instant timestamps.</li>
+                  <li>Optional end dates keep you time-aware.</li>
+                  <li>Track wins and misses in one calm space.</li>
+                </ul>
+              </section>
+            </div>
+          </main>
+        </div>
+      ) : (
+        <AppShell sessionEmail={session.user.email} onSignOut={handleSignOut}>
+          <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e0d8] px-6 py-4">
                 <div>
                   <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
                     Goals
@@ -798,164 +835,225 @@ export default function Home() {
                 </Button>
               </div>
 
-              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-                <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white p-4">
-                  <div className="text-lg font-semibold text-[#1a1a1a]">
-                    Table
-                  </div>
-                  <div className="mt-3 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#e6e0d8] bg-white">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col">
                     {goalsLoading ? (
-                      <div className="p-6 text-sm text-[#6b6b6b]">
+                      <div className="px-6 py-4 text-sm text-[#6b6b6b]">
                         Loading goals...
                       </div>
                     ) : orderedGoals.length === 0 ? (
-                      <div className="p-6 text-sm text-[#6b6b6b]">
+                      <div className="px-6 py-4 text-sm text-[#6b6b6b]">
                         {session
                           ? "No goals yet. Use Create goal to add one."
                           : "Sign in to view your goals."}
                       </div>
                     ) : (
-                      <div className="min-h-0 flex-1 overflow-y-auto">
-                        <table className="w-full text-left text-sm">
-                          <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
-                            <tr>
-                              <th className="px-4 py-2.5 font-medium">Goal</th>
-                              <th className="px-4 py-2.5 font-medium">Start</th>
-                              <th className="px-4 py-2.5 font-medium">End</th>
-                              <th className="px-4 py-2.5 font-medium">Categories</th>
+                    <div
+                      ref={tableContainerRef}
+                      className="relative min-h-0 flex-1 overflow-y-auto"
+                    >
+                      <table className="w-full table-fixed text-left text-sm">
+                        <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                          <tr>
+                            <th className="w-[40%] px-4 py-2.5 font-medium">Goal</th>
+                            <th className="w-[20%] px-4 py-2.5 font-medium">Start</th>
+                            <th className="w-[20%] px-4 py-2.5 font-medium">End</th>
+                            <th className="w-[20%] px-4 py-2.5 font-medium">
+                              Tags
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orderedGoals.map((goal) => (
+                            <tr
+                              key={goal.id}
+                              role="button"
+                              tabIndex={isAuthed ? 0 : -1}
+                              onClick={() => {
+                                if (!isAuthed) return;
+                                openEditGoal(goal);
+                              }}
+                              onMouseEnter={(event) =>
+                                handleRowEnter(goal.id, event.currentTarget)
+                              }
+                              onMouseLeave={handleRowLeave}
+                              onKeyDown={(event) => {
+                                if (!isAuthed) return;
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  openEditGoal(goal);
+                                }
+                              }}
+                              aria-disabled={!isAuthed}
+                              className={`h-11 border-t border-[#f1f0ec] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
+                                goal.outcome === "passed"
+                                  ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8]"
+                                  : goal.outcome === "failed"
+                                    ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2]"
+                                    : "hover:bg-[#fbfaf8]"
+                              }`}
+                            >
+                              <td className="px-4 py-2 text-[#1a1a1a]">
+                                <div className="flex items-center gap-2 truncate font-semibold">
+                                  {goal.outcome === "passed" ? (
+                                    <span
+                                      className="text-[#2f6f6a]"
+                                      aria-hidden="true"
+                                    >
+                                      ✓
+                                    </span>
+                                  ) : goal.outcome === "failed" ? (
+                                    <span
+                                      className="text-[#8b4a3a]"
+                                      aria-hidden="true"
+                                    >
+                                      x
+                                    </span>
+                                  ) : null}
+                                  <span className="truncate">{goal.title}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-xs text-[#6b6b6b]">
+                                {formatTimestamp(goal.createdAt)}
+                              </td>
+                              <td className="px-4 py-2 text-xs text-[#6b6b6b]">
+                                {goal.endAt ? (
+                                  <span className="truncate">
+                                    {formatTimestamp(goal.endAt)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[#b7b1a9]">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-[10px] text-[#6b6b6b]">
+                                {goal.categories.length > 0 ? (
+                                  <div className="flex items-center gap-1.5 truncate uppercase tracking-[0.16em]">
+                                    {goal.categories.slice(0, 2).map((category) => (
+                                      <span
+                                        key={`${goal.id}-${category}`}
+                                        className="truncate"
+                                      >
+                                        {category}
+                                      </span>
+                                    ))}
+                                    {goal.categories.length > 2 ? (
+                                      <span className="shrink-0">
+                                        +{goal.categories.length - 2}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                ) : (
+                                  <span className="uppercase tracking-[0.16em]">—</span>
+                                )}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {orderedGoals.map((goal) => (
-                              <tr
-                                key={goal.id}
-                                role="button"
-                                tabIndex={isAuthed ? 0 : -1}
+                          ))}
+                        </tbody>
+                      </table>
+                      {hoverCard ? (
+                        <div
+                          className="pointer-events-auto absolute left-4 right-4 z-20"
+                          style={{ top: hoverCard.top + 6 }}
+                          onMouseEnter={() => {
+                            if (hoverHideTimeoutRef.current) {
+                              window.clearTimeout(hoverHideTimeoutRef.current);
+                              hoverHideTimeoutRef.current = null;
+                            }
+                          }}
+                          onMouseLeave={handleRowLeave}
+                        >
+                          {(() => {
+                            const goal = orderedGoals.find(
+                              (item) => item.id === hoverCard.id,
+                            );
+                            if (!goal) return null;
+                            return (
+                              <div
+                                role="presentation"
                                 onClick={() => {
                                   if (!isAuthed) return;
                                   openEditGoal(goal);
                                 }}
-                                onKeyDown={(event) => {
-                                  if (!isAuthed) return;
-                                  if (event.key === "Enter" || event.key === " ") {
-                                    event.preventDefault();
-                                    openEditGoal(goal);
-                                  }
-                                }}
-                                aria-disabled={!isAuthed}
-                                className={`border-t border-[#f1f0ec] align-top transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
-                                  goal.outcome === "passed"
-                                    ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8]"
-                                    : goal.outcome === "failed"
-                                      ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2]"
-                                      : "hover:bg-[#fbfaf8]"
-                                }`}
+                                className="rounded-2xl border border-[#e6e0d8] bg-white p-4 shadow-xl"
                               >
-                                <td className="px-4 py-3 text-[#1a1a1a]">
-                                  <div className="flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 font-semibold">
-                                      {goal.outcome === "passed" ? (
-                                        <span
-                                          className="text-[#2f6f6a]"
-                                          aria-hidden="true"
-                                        >
-                                          ✓
-                                        </span>
-                                      ) : goal.outcome === "failed" ? (
-                                        <span
-                                          className="text-[#8b4a3a]"
-                                          aria-hidden="true"
-                                        >
-                                          x
-                                        </span>
-                                      ) : null}
-                                      <span>{goal.title}</span>
-                                    </div>
-                                    {!goal.outcome ? (
-                                      <div className="flex flex-wrap gap-2 text-xs">
-                                        <Button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleOutcome(goal.id, "passed");
-                                          }}
-                                          disabled={!isAuthed}
-                                          variant="outline"
-                                          className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                          Pass
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            handleOutcome(goal.id, "failed");
-                                          }}
-                                          disabled={!isAuthed}
-                                          variant="outline"
-                                          className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                          Fail
-                                        </Button>
-                                      </div>
-                                    ) : null}
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                  <div className="text-sm font-semibold text-[#1a1a1a]">
+                                    {goal.title}
                                   </div>
-                                </td>
-                                <td className="px-4 py-3 text-xs text-[#6b6b6b]">
-                                  {formatTimestamp(goal.createdAt)}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-[#6b6b6b]">
+                                  <div className="text-[11px] uppercase tracking-[0.18em] text-[#6b6b6b]">
+                                    {goal.outcome
+                                      ? goal.outcome === "passed"
+                                        ? "Passed"
+                                        : "Failed"
+                                      : "Unscored"}
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#6b6b6b]">
+                                  <span>Started {formatTimestamp(goal.createdAt)}</span>
                                   {goal.endAt ? (
-                                    <div className="flex flex-col gap-2">
-                                      <span>{formatTimestamp(goal.endAt)}</span>
-                                      {hasEnded(goal.endAt, clockTick) ? (
-                                        <span className="text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
-                                          Ended
-                                        </span>
-                                      ) : null}
-                                    </div>
+                                    <span>
+                                      {hasEnded(goal.endAt, clockTick)
+                                        ? `Ended ${formatTimestamp(goal.endAt)}`
+                                        : `Ends ${formatTimestamp(goal.endAt)}`}
+                                    </span>
                                   ) : (
-                                    <span className="text-[#b7b1a9]">—</span>
+                                    <span>No end date</span>
                                   )}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex flex-wrap gap-2 text-[10px]">
-                                    {goal.categories.length > 0 ? (
-                                      goal.categories.slice(0, 4).map((category) => (
-                                        <Badge
-                                          key={`${goal.id}-${category}`}
-                                          variant="outline"
-                                          className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#3a3a3a]"
-                                        >
-                                          {category}
-                                        </Badge>
-                                      ))
-                                    ) : (
-                                      <span className="text-[#b7b1a9]">—</span>
-                                    )}
-                                    {goal.categories.length > 4 ? (
+                                </div>
+                                {goal.categories.length > 0 ? (
+                                  <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
+                                    {goal.categories.map((category) => (
                                       <Badge
+                                        key={`${goal.id}-${category}`}
                                         variant="outline"
-                                        className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#6b6b6b]"
+                                        className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#3a3a3a]"
                                       >
-                                        +{goal.categories.length - 4}
+                                        {category}
                                       </Badge>
-                                    ) : null}
+                                    ))}
                                   </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
+                                ) : null}
+                                {!goal.outcome ? (
+                                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                                    <Button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleOutcome(goal.id, "passed");
+                                      }}
+                                      disabled={!isAuthed}
+                                      variant="outline"
+                                      className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      Pass
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleOutcome(goal.id, "failed");
+                                      }}
+                                      disabled={!isAuthed}
+                                      variant="outline"
+                                      className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      Fail
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
 
-                <div className="rounded-2xl border border-[#e6e0d8] bg-white p-4">
+                <div className="border-t border-[#e6e0d8] px-6 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="text-lg font-semibold text-[#1a1a1a]">
-                      Heatmap
+                    <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                      Outcomes
                     </div>
                     <div className="flex items-center gap-2">
                       <Select
@@ -977,7 +1075,7 @@ export default function Home() {
                   </div>
                   <div className="mt-2">
                     {dailyGrid.weeks.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                      <div className="border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
                         No completed goals yet. Mark a goal as passed or failed to see
                         progress.
                       </div>
@@ -1102,10 +1200,9 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            </section>
-          </AppShell>
-        )}
-      </main>
+          </section>
+        </AppShell>
+      )}
 
       <Dialog
         open={!!editGoal}
@@ -1418,6 +1515,6 @@ export default function Home() {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
