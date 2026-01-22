@@ -195,6 +195,9 @@ export default function Home() {
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
+  const [toasts, setToasts] = useState<
+    { id: string; message: string; tone?: "default" | "success" | "error" }[]
+  >([]);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editOutcome, setEditOutcome] = useState<"passed" | "failed" | null>(
@@ -210,6 +213,19 @@ export default function Home() {
 
   const isAuthed = !!session;
   const canSave = title.trim().length > 0 && isAuthed;
+
+  const pushToast = (
+    message: string,
+    tone: "default" | "success" | "error" = "default",
+  ) => {
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, message, tone }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 4000);
+  };
 
   useEffect(() => {
     if (!supabase) {
@@ -373,6 +389,7 @@ export default function Home() {
     const createdAt = (draftStartedAt ?? new Date()).toISOString();
     if (!supabase || !session) {
       setGoalsError("Sign in to save goals.");
+      pushToast("Sign in to save goals.", "error");
       return;
     }
 
@@ -390,6 +407,7 @@ export default function Home() {
 
     if (error || !savedGoal) {
       setGoalsError(error?.message ?? "Unable to save goal.");
+      pushToast(error?.message ?? "Unable to save goal.", "error");
       return;
     }
 
@@ -404,6 +422,7 @@ export default function Home() {
         );
       if (categoryError) {
         setGoalsError(categoryError.message);
+        pushToast(categoryError.message, "error");
       }
     }
 
@@ -422,6 +441,8 @@ export default function Home() {
     setGoals((current) => [newGoal, ...current]);
     resetForm();
     setSaveNotice("Goal saved.");
+    pushToast("Goal created.", "success");
+    setNewGoalOpen(false);
   };
 
   const orderedGoals = useMemo(() => goals, [goals]);
@@ -520,6 +541,7 @@ export default function Home() {
 
     if (error) {
       setGoalsError(error.message);
+      pushToast(error.message, "error");
       setEditSaving(false);
       return;
     }
@@ -531,6 +553,7 @@ export default function Home() {
         .eq("goal_id", editGoal.id);
       if (deleteError) {
         setGoalsError(deleteError.message);
+        pushToast(deleteError.message, "error");
         setEditSaving(false);
         return;
       }
@@ -546,6 +569,7 @@ export default function Home() {
           );
         if (insertError) {
           setGoalsError(insertError.message);
+          pushToast(insertError.message, "error");
           setEditSaving(false);
           return;
         }
@@ -573,6 +597,7 @@ export default function Home() {
 
     setEditSaving(false);
     closeEditGoal();
+    pushToast("Goal updated.", "success");
   };
 
   const handleDeleteGoal = async () => {
@@ -585,12 +610,14 @@ export default function Home() {
     const { error } = await supabase.from("goals").delete().eq("id", editGoal.id);
     if (error) {
       setGoalsError(error.message);
+      pushToast(error.message, "error");
       setEditDeleting(false);
       return;
     }
     setGoals((current) => current.filter((goal) => goal.id !== editGoal.id));
     setEditDeleting(false);
     closeEditGoal();
+    pushToast("Goal deleted.", "success");
   };
 
   const handleGoogleSignIn = async () => {
@@ -608,6 +635,9 @@ export default function Home() {
     });
     if (error) {
       setAuthError(error.message);
+      pushToast(error.message, "error");
+    } else {
+      pushToast("Redirecting to Google sign-in.", "default");
     }
   };
 
@@ -620,6 +650,7 @@ export default function Home() {
     }
     if (!email.trim()) {
       setAuthError("Enter an email address to continue.");
+      pushToast("Enter an email address to continue.", "error");
       return;
     }
     const { error } = await supabase.auth.signInWithOtp({
@@ -630,9 +661,11 @@ export default function Home() {
     });
     if (error) {
       setAuthError(error.message);
+      pushToast(error.message, "error");
       return;
     }
     setAuthNotice("Check your email for a sign-in link.");
+    pushToast("Check your email for a sign-in link.", "success");
     setEmail("");
   };
 
@@ -643,6 +676,9 @@ export default function Home() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       setAuthError(error.message);
+      pushToast(error.message, "error");
+    } else {
+      pushToast("Signed out.", "success");
     }
   };
 
@@ -740,309 +776,331 @@ export default function Home() {
           </div>
         ) : (
           <AppShell embedded sessionEmail={session.user.email} onSignOut={handleSignOut}>
-            <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[#e6e0d8] bg-white/80 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold">Goals</h2>
-                    <p className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                      {orderedGoals.length} total
-                    </p>
+            <section className="flex min-h-0 flex-1 flex-col rounded-3xl border border-[#e6e0d8] bg-white/85 p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                    Goals
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => setNewGoalOpen(true)}
-                    className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
-                  >
-                    Create goal
-                  </Button>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#1a1a1a]">
+                    Dashboard
+                  </h2>
+                  <p className="mt-2 text-sm text-[#6b6b6b]">
+                    {orderedGoals.length} total
+                  </p>
                 </div>
+                <Button
+                  type="button"
+                  onClick={() => setNewGoalOpen(true)}
+                  className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
+                >
+                  Create goal
+                </Button>
+              </div>
 
-                <div className="mt-4 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#e6e0d8] bg-white">
-                  {goalsLoading ? (
-                    <div className="p-6 text-sm text-[#6b6b6b]">
-                      Loading goals...
-                    </div>
-                  ) : orderedGoals.length === 0 ? (
-                    <div className="p-6 text-sm text-[#6b6b6b]">
-                      {session
-                        ? "No goals yet. Use Create goal to add one."
-                        : "Sign in to view your goals."}
-                    </div>
-                  ) : (
-                    <div className="max-h-none flex-1 overflow-y-auto">
-                      <table className="w-full text-left text-sm">
-                        <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
-                          <tr>
-                            <th className="px-4 py-2.5 font-medium">Goal</th>
-                            <th className="px-4 py-2.5 font-medium">Start</th>
-                            <th className="px-4 py-2.5 font-medium">End</th>
-                            <th className="px-4 py-2.5 font-medium">Categories</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {orderedGoals.map((goal) => (
-                            <tr
-                              key={goal.id}
-                              role="button"
-                              tabIndex={isAuthed ? 0 : -1}
-                              onClick={() => {
-                                if (!isAuthed) return;
-                                openEditGoal(goal);
-                              }}
-                              onKeyDown={(event) => {
-                                if (!isAuthed) return;
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
+              <div className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+                <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white p-4">
+                  <div className="text-lg font-semibold text-[#1a1a1a]">
+                    Table
+                  </div>
+                  <div className="mt-3 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#e6e0d8] bg-white">
+                    {goalsLoading ? (
+                      <div className="p-6 text-sm text-[#6b6b6b]">
+                        Loading goals...
+                      </div>
+                    ) : orderedGoals.length === 0 ? (
+                      <div className="p-6 text-sm text-[#6b6b6b]">
+                        {session
+                          ? "No goals yet. Use Create goal to add one."
+                          : "Sign in to view your goals."}
+                      </div>
+                    ) : (
+                      <div className="min-h-0 flex-1 overflow-y-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                            <tr>
+                              <th className="px-4 py-2.5 font-medium">Goal</th>
+                              <th className="px-4 py-2.5 font-medium">Start</th>
+                              <th className="px-4 py-2.5 font-medium">End</th>
+                              <th className="px-4 py-2.5 font-medium">Categories</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {orderedGoals.map((goal) => (
+                              <tr
+                                key={goal.id}
+                                role="button"
+                                tabIndex={isAuthed ? 0 : -1}
+                                onClick={() => {
+                                  if (!isAuthed) return;
                                   openEditGoal(goal);
-                                }
-                              }}
-                              aria-disabled={!isAuthed}
-                              className={`border-t border-[#f1f0ec] align-top transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
-                                goal.outcome === "passed"
-                                  ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8]"
-                                  : goal.outcome === "failed"
-                                    ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2]"
-                                    : "hover:bg-[#fbfaf8]"
-                              }`}
-                            >
-                              <td className="px-4 py-3 text-[#1a1a1a]">
-                                <div className="flex flex-col gap-2">
-                                  <div className="flex items-center gap-2 font-semibold">
-                                    {goal.outcome === "passed" ? (
-                                      <span className="text-[#2f6f6a]" aria-hidden="true">
-                                        ✓
-                                      </span>
-                                    ) : goal.outcome === "failed" ? (
-                                      <span className="text-[#8b4a3a]" aria-hidden="true">
-                                        x
-                                      </span>
-                                    ) : null}
-                                    <span>{goal.title}</span>
-                                  </div>
-                                  {!goal.outcome ? (
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                      <Button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleOutcome(goal.id, "passed");
-                                        }}
-                                        disabled={!isAuthed}
-                                        variant="outline"
-                                        className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                      >
-                                        Pass
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleOutcome(goal.id, "failed");
-                                        }}
-                                        disabled={!isAuthed}
-                                        variant="outline"
-                                        className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                      >
-                                        Fail
-                                      </Button>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-[#6b6b6b]">
-                                {formatTimestamp(goal.createdAt)}
-                              </td>
-                              <td className="px-4 py-3 text-xs text-[#6b6b6b]">
-                                {goal.endAt ? (
+                                }}
+                                onKeyDown={(event) => {
+                                  if (!isAuthed) return;
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    openEditGoal(goal);
+                                  }
+                                }}
+                                aria-disabled={!isAuthed}
+                                className={`border-t border-[#f1f0ec] align-top transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
+                                  goal.outcome === "passed"
+                                    ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8]"
+                                    : goal.outcome === "failed"
+                                      ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2]"
+                                      : "hover:bg-[#fbfaf8]"
+                                }`}
+                              >
+                                <td className="px-4 py-3 text-[#1a1a1a]">
                                   <div className="flex flex-col gap-2">
-                                    <span>{formatTimestamp(goal.endAt)}</span>
-                                    {hasEnded(goal.endAt, clockTick) ? (
-                                      <span className="text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
-                                        Ended
-                                      </span>
+                                    <div className="flex items-center gap-2 font-semibold">
+                                      {goal.outcome === "passed" ? (
+                                        <span
+                                          className="text-[#2f6f6a]"
+                                          aria-hidden="true"
+                                        >
+                                          ✓
+                                        </span>
+                                      ) : goal.outcome === "failed" ? (
+                                        <span
+                                          className="text-[#8b4a3a]"
+                                          aria-hidden="true"
+                                        >
+                                          x
+                                        </span>
+                                      ) : null}
+                                      <span>{goal.title}</span>
+                                    </div>
+                                    {!goal.outcome ? (
+                                      <div className="flex flex-wrap gap-2 text-xs">
+                                        <Button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleOutcome(goal.id, "passed");
+                                          }}
+                                          disabled={!isAuthed}
+                                          variant="outline"
+                                          className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          Pass
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            handleOutcome(goal.id, "failed");
+                                          }}
+                                          disabled={!isAuthed}
+                                          variant="outline"
+                                          className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                          Fail
+                                        </Button>
+                                      </div>
                                     ) : null}
                                   </div>
-                                ) : (
-                                  <span className="text-[#b7b1a9]">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="flex flex-wrap gap-2 text-[10px]">
-                                  {goal.categories.length > 0 ? (
-                                    goal.categories.slice(0, 4).map((category) => (
-                                      <Badge
-                                        key={`${goal.id}-${category}`}
-                                        variant="outline"
-                                        className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#3a3a3a]"
-                                      >
-                                        {category}
-                                      </Badge>
-                                    ))
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[#6b6b6b]">
+                                  {formatTimestamp(goal.createdAt)}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-[#6b6b6b]">
+                                  {goal.endAt ? (
+                                    <div className="flex flex-col gap-2">
+                                      <span>{formatTimestamp(goal.endAt)}</span>
+                                      {hasEnded(goal.endAt, clockTick) ? (
+                                        <span className="text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                                          Ended
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   ) : (
                                     <span className="text-[#b7b1a9]">—</span>
                                   )}
-                                  {goal.categories.length > 4 ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#6b6b6b]"
-                                    >
-                                      +{goal.categories.length - 4}
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </section>
-
-            <section className="rounded-3xl border border-[#e6e0d8] bg-white/90 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold">Goal outcomes</h3>
-                </div>
-                <div className="flex justify-center">
-                  <Select
-                    value={String(selectedYear)}
-                    onValueChange={(value) => setSelectedYear(Number(value))}
-                  >
-                    <SelectTrigger className="h-9 w-[88px] justify-center rounded-full border-[#1a1a1a]/20 px-2 text-xs uppercase tracking-[0.2em]">
-                      <SelectValue placeholder="Year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableYears.map((year) => (
-                        <SelectItem key={year} value={String(year)}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                {dailyGrid.weeks.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
-                    No completed goals yet. Mark a goal as passed or failed to see
-                    progress.
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-[auto_1fr] gap-3">
-                      <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
-                        {["Mon", "Wed", "Fri"].map((day, index) => (
-                          <span
-                            key={day}
-                            className="h-3 leading-3"
-                            style={{ gridRowStart: 2 + index * 2 }}
-                          >
-                            {day}
-                          </span>
-                        ))}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-wrap gap-2 text-[10px]">
+                                    {goal.categories.length > 0 ? (
+                                      goal.categories.slice(0, 4).map((category) => (
+                                        <Badge
+                                          key={`${goal.id}-${category}`}
+                                          variant="outline"
+                                          className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#3a3a3a]"
+                                        >
+                                          {category}
+                                        </Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-[#b7b1a9]">—</span>
+                                    )}
+                                    {goal.categories.length > 4 ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#6b6b6b]"
+                                      >
+                                        +{goal.categories.length - 4}
+                                      </Badge>
+                                    ) : null}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                      <div>
-                        <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
-                          {dailyGrid.monthLabels.map((label) => (
-                            <span
-                              key={`${label.index}-${label.label}`}
-                              style={{ gridColumnStart: label.index + 1 }}
-                            >
-                              {label.label}
-                            </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#e6e0d8] bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="text-lg font-semibold text-[#1a1a1a]">
+                      Heatmap
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={String(selectedYear)}
+                        onValueChange={(value) => setSelectedYear(Number(value))}
+                      >
+                        <SelectTrigger className="h-8 w-[88px] justify-center rounded-full border-[#1a1a1a]/20 px-2 text-[10px] uppercase tracking-[0.2em]">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableYears.map((year) => (
+                            <SelectItem key={year} value={String(year)}>
+                              {year}
+                            </SelectItem>
                           ))}
-                        </div>
-                        <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
-                          {dailyGrid.weeks.map((week, weekIndex) => (
-                            <div key={`week-${weekIndex}`} className="grid gap-[6px]">
-                              {week.map((cell, dayIndex) => {
-                                if (!cell) {
-                                  return (
-                                    <span
-                                      key={`empty-${weekIndex}-${dayIndex}`}
-                                      className="h-3 w-3 rounded-[4px]"
-                                    />
-                                  );
-                                }
-                                const total = cell.passCount + cell.failCount;
-                                const passRatio = total > 0 ? cell.passCount / total : 0;
-                                const intensity =
-                                  total === 0
-                                    ? 0
-                                    : Math.min(
-                                        1,
-                                        0.35 + total / Math.max(1, dailyGrid.maxTotal),
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    {dailyGrid.weeks.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                        No completed goals yet. Mark a goal as passed or failed to see
+                        progress.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-[auto_1fr] gap-3">
+                          <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
+                            {["Mon", "Wed", "Fri"].map((day, index) => (
+                              <span
+                                key={day}
+                                className="h-3 leading-3"
+                                style={{ gridRowStart: 2 + index * 2 }}
+                              >
+                                {day}
+                              </span>
+                            ))}
+                          </div>
+                          <div>
+                            <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
+                              {dailyGrid.monthLabels.map((label) => (
+                                <span
+                                  key={`${label.index}-${label.label}`}
+                                  style={{ gridColumnStart: label.index + 1 }}
+                                >
+                                  {label.label}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
+                              {dailyGrid.weeks.map((week, weekIndex) => (
+                                <div key={`week-${weekIndex}`} className="grid gap-[6px]">
+                                  {week.map((cell, dayIndex) => {
+                                    if (!cell) {
+                                      return (
+                                        <span
+                                          key={`empty-${weekIndex}-${dayIndex}`}
+                                          className="h-3 w-3 rounded-[4px]"
+                                        />
                                       );
-                                const green = `rgba(47, 179, 106, ${intensity})`;
-                                const red = `rgba(227, 83, 63, ${intensity})`;
+                                    }
+                                    const total = cell.passCount + cell.failCount;
+                                    const passRatio = total > 0 ? cell.passCount / total : 0;
+                                    const intensity =
+                                      total === 0
+                                        ? 0
+                                        : Math.min(
+                                            1,
+                                            0.35 +
+                                              total / Math.max(1, dailyGrid.maxTotal),
+                                          );
+                                    const green = `rgba(47, 179, 106, ${intensity})`;
+                                    const red = `rgba(227, 83, 63, ${intensity})`;
+                                    const background =
+                                      total === 0
+                                        ? "#f1f0ec"
+                                        : `linear-gradient(90deg, ${green} ${Math.round(
+                                            passRatio * 100,
+                                          )}%, ${red} ${Math.round(
+                                            passRatio * 100,
+                                          )}%)`;
+                                    return (
+                                      <span
+                                        key={cell.key}
+                                        className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                        style={{ background }}
+                                        title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
+                          <div className="flex items-center gap-2">
+                            <span>Passed</span>
+                            <div className="flex items-center gap-2">
+                              {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
                                 const background =
-                                  total === 0
-                                    ? "#f1f0ec"
-                                    : `linear-gradient(90deg, ${green} ${Math.round(
-                                        passRatio * 100,
-                                      )}%, ${red} ${Math.round(passRatio * 100)}%)`;
+                                  passRatio === 1
+                                    ? "#2fb36a"
+                                    : passRatio === 0
+                                      ? "#e3533f"
+                                      : `linear-gradient(90deg, #2fb36a ${Math.round(
+                                          passRatio * 100,
+                                        )}%, #e3533f ${Math.round(
+                                          passRatio * 100,
+                                        )}%)`;
                                 return (
                                   <span
-                                    key={cell.key}
+                                    key={`pf-${index}`}
                                     className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
                                     style={{ background }}
-                                    title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
                                   />
                                 );
                               })}
                             </div>
-                          ))}
+                            <span>Failed</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span>Less</span>
+                            <div className="flex items-center gap-2">
+                              {[0, 0.35, 0.55, 0.75, 1].map((step) => (
+                                <span
+                                  key={`legend-${step}`}
+                                  className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                  style={{
+                                    background:
+                                      step === 0
+                                        ? "#f1f0ec"
+                                        : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <span>More</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
-                      <div className="flex items-center gap-2">
-                        <span>Passed</span>
-                        <div className="flex items-center gap-2">
-                          {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
-                            const background =
-                              passRatio === 1
-                                ? "#2fb36a"
-                                : passRatio === 0
-                                  ? "#e3533f"
-                                  : `linear-gradient(90deg, #2fb36a ${Math.round(
-                                      passRatio * 100,
-                                    )}%, #e3533f ${Math.round(passRatio * 100)}%)`;
-                            return (
-                              <span
-                                key={`pf-${index}`}
-                                className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
-                                style={{ background }}
-                              />
-                            );
-                          })}
-                        </div>
-                        <span>Failed</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span>Less</span>
-                        <div className="flex items-center gap-2">
-                          {[0, 0.35, 0.55, 0.75, 1].map((step) => (
-                            <span
-                              key={`legend-${step}`}
-                              className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
-                              style={{
-                                background:
-                                  step === 0
-                                    ? "#f1f0ec"
-                                    : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
-                              }}
-                            />
-                          ))}
-                        </div>
-                        <span>More</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </section>
           </AppShell>
@@ -1343,6 +1401,23 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <div className="fixed bottom-6 right-6 z-50 flex w-[280px] flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`rounded-2xl border px-4 py-3 text-xs shadow-lg ${
+              toast.tone === "success"
+                ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                : toast.tone === "error"
+                  ? "border-[#8b4a3a] bg-[#f3e6e2] text-[#8b4a3a]"
+                  : "border-[#e6e0d8] bg-white text-[#3a3a3a]"
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

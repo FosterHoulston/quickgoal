@@ -235,17 +235,15 @@ export default function TagsPage() {
                 No tags yet. Create your first tag above.
               </div>
             ) : (
-              <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-2 md:grid-cols-2">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                <div className="columns-1 gap-3 md:columns-2">
                 {tags.map((tag) => (
                   <button
                     key={tag.id}
                     type="button"
                     onClick={() => openEdit(tag)}
-                    className="flex h-full flex-col gap-3 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-left transition hover:border-[#2f6f6a]"
+                    className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-left transition hover:border-[#2f6f6a]"
                   >
-                    <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                      Tag
-                    </div>
                     <div className="text-lg font-semibold text-[#1a1a1a]">
                       {tag.name}
                     </div>
@@ -254,6 +252,7 @@ export default function TagsPage() {
                     </p>
                   </button>
                 ))}
+                </div>
               </div>
             )}
           </div>
