@@ -1,6 +1,5 @@
 "use client";
 
-import type { Session } from "@supabase/supabase-js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,24 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
+import { useGoalData } from "@/components/GoalDataProvider";
 import { supabase } from "@/lib/supabaseClient";
-
-type Goal = {
-  id: string;
-  title: string;
-  createdAt: string;
-  endAt?: string;
-  outcome?: "passed" | "failed";
-  categoryIds?: string[];
-  categories: string[];
-};
-
-type Category = {
-  id: string;
-  name: string;
-  description?: string | null;
-};
+import type { Category, Goal } from "@/lib/types";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "health", name: "Health" },
@@ -178,20 +164,32 @@ const buildDailyGrid = (goals: Goal[], year: number) => {
 };
 
 export default function Home() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { session, authReady } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
-  const [categoriesFromDb, setCategoriesFromDb] = useState(false);
+  const {
+    categories,
+    setCategories,
+    categoriesLoaded,
+    setCategoriesLoaded,
+    categoriesFromDb,
+    setCategoriesFromDb,
+    categoriesUserId,
+    setCategoriesUserId,
+    goals,
+    setGoals,
+    goalsLoaded,
+    setGoalsLoaded,
+    goalsUserId,
+    setGoalsUserId,
+  } = useGoalData();
   const [title, setTitle] = useState("");
   const [draftStartedAt, setDraftStartedAt] = useState<Date | null>(null);
   const [hasEndAt, setHasEndAt] = useState(false);
   const [endAt, setEndAt] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [goalsLoading, setGoalsLoading] = useState(false);
+  const [goalsLoading, setGoalsLoading] = useState(!goalsLoaded);
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
@@ -235,34 +233,28 @@ export default function Home() {
 
   useEffect(() => {
     if (!supabase) {
-      setAuthReady(true);
+      setCategories(DEFAULT_CATEGORIES);
+      setCategoriesFromDb(false);
+      setCategoriesUserId(null);
+      setCategoriesLoaded(true);
       return;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setAuthReady(true);
-    });
-
-    const { data: subscription } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        setSession(newSession);
-      },
-    );
-
-    return () => {
-      subscription?.subscription.unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!supabase || !session) {
+    if (!session) {
+      if (!authReady) return;
       setCategories(DEFAULT_CATEGORIES);
       setCategoriesFromDb(false);
+      setCategoriesUserId(null);
+      setCategoriesLoaded(true);
+      return;
+    }
+
+    if (categoriesLoaded && categoriesUserId === session.user.id) {
       return;
     }
 
     const loadCategories = async () => {
+      setCategoriesLoaded(false);
       const { data, error } = await supabase
         .from("categories")
         .select("id, name, description, user_id")
@@ -271,6 +263,8 @@ export default function Home() {
       if (error) {
         setCategories(DEFAULT_CATEGORIES);
         setCategoriesFromDb(false);
+        setCategoriesUserId(null);
+        setCategoriesLoaded(true);
         return;
       }
 
@@ -306,28 +300,61 @@ export default function Home() {
         if (!reloaded || reloaded.length === 0) {
           setCategories(DEFAULT_CATEGORIES);
           setCategoriesFromDb(false);
+          setCategoriesUserId(null);
+          setCategoriesLoaded(true);
           return;
         }
         setCategories(reloaded);
         setCategoriesFromDb(true);
+        setCategoriesUserId(session.user.id);
+        setCategoriesLoaded(true);
         return;
       }
 
       setCategories(data);
       setCategoriesFromDb(true);
+      setCategoriesUserId(session.user.id);
+      setCategoriesLoaded(true);
     };
 
     loadCategories();
-  }, [session]);
+  }, [
+    authReady,
+    session,
+    categoriesLoaded,
+    categoriesUserId,
+    setCategories,
+    setCategoriesFromDb,
+    setCategoriesLoaded,
+    setCategoriesUserId,
+  ]);
 
   useEffect(() => {
-    if (!supabase || !session) {
+    if (!supabase) {
       setGoals([]);
+      setGoalsUserId(null);
+      setGoalsLoaded(true);
+      setGoalsLoading(false);
+      return;
+    }
+
+    if (!session) {
+      if (!authReady) return;
+      setGoals([]);
+      setGoalsUserId(null);
+      setGoalsLoaded(true);
+      setGoalsLoading(false);
+      return;
+    }
+
+    if (goalsLoaded && goalsUserId === session.user.id) {
+      setGoalsLoading(false);
       return;
     }
 
     const loadGoals = async () => {
       setGoalsLoading(true);
+      setGoalsLoaded(false);
       setGoalsError(null);
       const { data, error } = await supabase
         .from("goals")
@@ -338,6 +365,7 @@ export default function Home() {
       if (error || !data) {
         setGoalsError(error?.message ?? "Unable to load goals.");
         setGoalsLoading(false);
+        setGoalsLoaded(true);
         return;
       }
       const mapped: Goal[] = data.map((goal) => ({
@@ -353,10 +381,20 @@ export default function Home() {
       }));
       setGoals(mapped);
       setGoalsLoading(false);
+      setGoalsLoaded(true);
+      setGoalsUserId(session.user.id);
     };
 
     loadGoals();
-  }, [session]);
+  }, [
+    authReady,
+    session,
+    goalsLoaded,
+    goalsUserId,
+    setGoals,
+    setGoalsLoaded,
+    setGoalsUserId,
+  ]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -364,6 +402,31 @@ export default function Home() {
     }, 60_000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const shouldIgnore = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (target.isContentEditable) return true;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (shouldIgnore(event.target)) return;
+      if (editGoal || newGoalOpen) return;
+
+      if (event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        setNewGoalOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [editGoal, newGoalOpen]);
 
   const handleTitleChange = (value: string) => {
     if (!draftStartedAt && value.trim().length > 0) {
@@ -814,12 +877,9 @@ export default function Home() {
       ) : (
         <AppShell sessionEmail={session.user.email} onSignOut={handleSignOut}>
           <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e0d8] px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e0d8] px-6 py-3">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                    Goals
-                  </div>
-                  <h2 className="mt-2 text-2xl font-semibold text-[#1a1a1a]">
+                  <h2 className="text-2xl font-semibold text-[#1a1a1a]">
                     Dashboard
                   </h2>
                   <p className="mt-2 text-sm text-[#6b6b6b]">
@@ -829,9 +889,12 @@ export default function Home() {
                 <Button
                   type="button"
                   onClick={() => setNewGoalOpen(true)}
-                  className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
+                  className="flex items-center gap-2 rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
                 >
                   Create goal
+                  <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-sm border border-[#e6e0d8] bg-white font-mono leading-none text-[#1a1a1a] shadow-sm normal-case tracking-normal">
+                    G
+                  </span>
                 </Button>
               </div>
 
@@ -848,11 +911,12 @@ export default function Home() {
                           : "Sign in to view your goals."}
                       </div>
                     ) : (
-                    <div
-                      ref={tableContainerRef}
-                      className="relative min-h-0 flex-1 overflow-y-auto"
-                    >
-                      <table className="w-full table-fixed text-left text-sm">
+                    <div className="relative min-h-0 flex-1">
+                      <div
+                        ref={tableContainerRef}
+                        className="min-h-0 flex-1 overflow-y-auto"
+                      >
+                        <table className="w-full table-fixed text-left text-sm">
                         <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
                           <tr>
                             <th className="w-[40%] px-4 py-2.5 font-medium">Goal</th>
@@ -887,10 +951,10 @@ export default function Home() {
                               aria-disabled={!isAuthed}
                               className={`h-11 border-t border-[#f1f0ec] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
                                 goal.outcome === "passed"
-                                  ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8]"
+                                  ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8] dark:hover:bg-[#1f2e2b]"
                                   : goal.outcome === "failed"
-                                    ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2]"
-                                    : "hover:bg-[#fbfaf8]"
+                                    ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2] dark:hover:bg-[#2b1f1c]"
+                                    : "hover:bg-[#fbfaf8] dark:hover:bg-[#1c2027]"
                               }`}
                             >
                               <td className="px-4 py-2 text-[#1a1a1a]">
@@ -949,7 +1013,8 @@ export default function Home() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                        </table>
+                      </div>
                       {hoverCard ? (
                         <div
                           className="pointer-events-auto absolute left-4 right-4 z-20"
@@ -1052,9 +1117,6 @@ export default function Home() {
 
                 <div className="border-t border-[#e6e0d8] px-6 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-                      Outcomes
-                    </div>
                     <div className="flex items-center gap-2">
                       <Select
                         value={String(selectedYear)}
@@ -1080,119 +1142,117 @@ export default function Home() {
                         progress.
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-[auto_1fr] gap-3">
-                          <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
-                            {["Mon", "Wed", "Fri"].map((day, index) => (
+                      <div className="grid grid-cols-[auto_1fr] gap-3">
+                        <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
+                          {["Mon", "Wed", "Fri"].map((day, index) => (
+                            <span
+                              key={day}
+                              className="h-3 leading-3"
+                              style={{ gridRowStart: 2 + index * 2 }}
+                            >
+                              {day}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="w-fit max-w-full">
+                          <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
+                            {dailyGrid.monthLabels.map((label) => (
                               <span
-                                key={day}
-                                className="h-3 leading-3"
-                                style={{ gridRowStart: 2 + index * 2 }}
+                                key={`${label.index}-${label.label}`}
+                                style={{ gridColumnStart: label.index + 1 }}
                               >
-                                {day}
+                                {label.label}
                               </span>
                             ))}
                           </div>
-                          <div>
-                            <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
-                              {dailyGrid.monthLabels.map((label) => (
-                                <span
-                                  key={`${label.index}-${label.label}`}
-                                  style={{ gridColumnStart: label.index + 1 }}
-                                >
-                                  {label.label}
-                                </span>
-                              ))}
-                            </div>
-                            <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
-                              {dailyGrid.weeks.map((week, weekIndex) => (
-                                <div key={`week-${weekIndex}`} className="grid gap-[6px]">
-                                  {week.map((cell, dayIndex) => {
-                                    if (!cell) {
-                                      return (
-                                        <span
-                                          key={`empty-${weekIndex}-${dayIndex}`}
-                                          className="h-3 w-3 rounded-[4px]"
-                                        />
-                                      );
-                                    }
-                                    const total = cell.passCount + cell.failCount;
-                                    const passRatio = total > 0 ? cell.passCount / total : 0;
-                                    const intensity =
+                          <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
+                            {dailyGrid.weeks.map((week, weekIndex) => (
+                              <div key={`week-${weekIndex}`} className="grid gap-[6px]">
+                                {week.map((cell, dayIndex) => {
+                                  if (!cell) {
+                                    return (
+                                      <span
+                                        key={`empty-${weekIndex}-${dayIndex}`}
+                                        className="h-3 w-3 rounded-[4px]"
+                                      />
+                                    );
+                                  }
+                                  const total = cell.passCount + cell.failCount;
+                                  const passRatio = total > 0 ? cell.passCount / total : 0;
+                                  const intensity =
+                                    total === 0
+                                      ? 0
+                                      : Math.min(
+                                          1,
+                                          0.35 +
+                                            total / Math.max(1, dailyGrid.maxTotal),
+                                        );
+                                  const green = `rgba(47, 179, 106, ${intensity})`;
+                                  const red = `rgba(227, 83, 63, ${intensity})`;
+                                  const background =
                                       total === 0
-                                        ? 0
-                                        : Math.min(
-                                            1,
-                                            0.35 +
-                                              total / Math.max(1, dailyGrid.maxTotal),
-                                          );
-                                    const green = `rgba(47, 179, 106, ${intensity})`;
-                                    const red = `rgba(227, 83, 63, ${intensity})`;
-                                    const background =
-                                      total === 0
-                                        ? "#f1f0ec"
+                                        ? "var(--app-surface-subtle)"
                                         : `linear-gradient(90deg, ${green} ${Math.round(
                                             passRatio * 100,
                                           )}%, ${red} ${Math.round(
                                             passRatio * 100,
                                           )}%)`;
-                                    return (
-                                      <span
-                                        key={cell.key}
-                                        className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
-                                        style={{ background }}
-                                        title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
-                                      />
-                                    );
-                                  })}
-                                </div>
-                              ))}
-                            </div>
+                                  return (
+                                    <span
+                                      key={cell.key}
+                                      className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                      style={{ background }}
+                                      title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
-                          <div className="flex items-center gap-2">
-                            <span>Passed</span>
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
                             <div className="flex items-center gap-2">
-                              {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
-                                const background =
-                                  passRatio === 1
-                                    ? "#2fb36a"
-                                    : passRatio === 0
-                                      ? "#e3533f"
-                                      : `linear-gradient(90deg, #2fb36a ${Math.round(
-                                          passRatio * 100,
-                                        )}%, #e3533f ${Math.round(
-                                          passRatio * 100,
-                                        )}%)`;
-                                return (
+                              <span>Passed</span>
+                              <div className="flex items-center gap-2">
+                                {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
+                                  const background =
+                                    passRatio === 1
+                                      ? "#2fb36a"
+                                      : passRatio === 0
+                                        ? "#e3533f"
+                                        : `linear-gradient(90deg, #2fb36a ${Math.round(
+                                            passRatio * 100,
+                                          )}%, #e3533f ${Math.round(
+                                            passRatio * 100,
+                                          )}%)`;
+                                  return (
+                                    <span
+                                      key={`pf-${index}`}
+                                      className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                      style={{ background }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                              <span>Failed</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span>Less</span>
+                              <div className="flex items-center gap-2">
+                                {[0, 0.35, 0.55, 0.75, 1].map((step) => (
                                   <span
-                                    key={`pf-${index}`}
+                                    key={`legend-${step}`}
                                     className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
-                                    style={{ background }}
-                                  />
-                                );
-                              })}
-                            </div>
-                            <span>Failed</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span>Less</span>
-                            <div className="flex items-center gap-2">
-                              {[0, 0.35, 0.55, 0.75, 1].map((step) => (
-                                <span
-                                  key={`legend-${step}`}
-                                  className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
-                                  style={{
-                                    background:
-                                      step === 0
-                                        ? "#f1f0ec"
-                                        : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
+                                    style={{
+                                      background:
+                                        step === 0
+                                          ? "var(--app-surface-subtle)"
+                                          : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
                                   }}
                                 />
-                              ))}
+                                ))}
+                              </div>
+                              <span>More</span>
                             </div>
-                            <span>More</span>
                           </div>
                         </div>
                       </div>
@@ -1373,6 +1433,11 @@ export default function Home() {
         <DialogContent
           showCloseButton={false}
           className="w-full max-w-2xl rounded-3xl border-[#e6e0d8] bg-white p-5 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]"
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            handleSave();
+          }}
         >
           <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
             <div>

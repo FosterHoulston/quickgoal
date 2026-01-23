@@ -4,6 +4,16 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --app-bg: radial-gradient(circle at top, #f9f2e8 0%, #f2f7f6 45%, #f7f4ef 100%);
+  --app-surface: #ffffff;
+  --app-surface-muted: #fbfaf8;
+  --app-surface-subtle: #f1f0ec;
+  --app-surface-alt: #f7f5f1;
+  --app-border: #e6e0d8;
+  --app-text: #1a1a1a;
+  --app-text-muted: #6b6b6b;
+  --app-text-subtle: #3a3a3a;
+  --app-text-disabled: #b7b1a9;
   --muted: oklch(0.97 0 0);
   --accent: oklch(0.97 0 0);
   --card: oklch(1 0 0);
@@ -82,11 +92,21 @@
 }
 
 body {
-  background: radial-gradient(circle at top, #f9f2e8 0%, #f2f7f6 45%, #f7f4ef 100%);
+  background: var(--app-bg);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 .dark {
+  --app-bg: radial-gradient(circle at top, #1a1b20 0%, #14161b 45%, #0f1116 100%);
+  --app-surface: #17191f;
+  --app-surface-muted: #1a1d23;
+  --app-surface-subtle: #20242b;
+  --app-surface-alt: #1c2027;
+  --app-border: #2a2f39;
+  --app-text: #f2f4f7;
+  --app-text-muted: #a4a9b2;
+  --app-text-subtle: #d6d9df;
+  --app-text-disabled: #6b707a;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -118,6 +138,88 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+.dark .bg-white {
+  background-color: var(--app-surface) !important;
+}
+
+.dark .bg-white\/90,
+.dark .bg-white\/70 {
+  background-color: var(--app-surface) !important;
+}
+
+.dark .bg-\[\#fbfaf8\],
+.dark .bg-\[\#f7f5f1\],
+.dark .bg-\[\#f1f0ec\] {
+  background-color: var(--app-surface-muted) !important;
+}
+
+.dark .bg-\[\#f4faf8\],
+.dark .bg-\[\#fbf4f2\],
+.dark .bg-\[\#f3e6e2\],
+.dark .bg-\[\#e7f1ef\] {
+  background-color: var(--app-surface-subtle) !important;
+}
+
+.dark .text-\[\#1a1a1a\] {
+  color: var(--app-text) !important;
+}
+
+.dark .text-\[\#6b6b6b\] {
+  color: var(--app-text-muted) !important;
+}
+
+.dark .text-\[\#3a3a3a\] {
+  color: var(--app-text-subtle) !important;
+}
+
+.dark .text-\[\#b7b1a9\] {
+  color: var(--app-text-disabled) !important;
+}
+
+.dark .bg-\[\#1a1a1a\] {
+  background-color: var(--app-text) !important;
+}
+
+.dark .text-white {
+  color: #0f1116 !important;
+}
+
+.dark .hover\:bg-\[\#2f6f6a\]:hover {
+  background-color: #2f6f6a !important;
+}
+
+.dark .hover\:border-\[\#2f6f6a\]:hover {
+  border-color: #2f6f6a !important;
+}
+
+.dark .dark\:hover\:border-white:hover {
+  border-color: #ffffff !important;
+}
+
+.dark .border-\[\#e6e0d8\] {
+  border-color: var(--app-border) !important;
+}
+
+.dark .border-\[\#f1f0ec\] {
+  border-color: var(--app-border) !important;
+}
+
+.dark .border-\[\#1a1a1a\] {
+  border-color: var(--app-text) !important;
+}
+
+.dark .border-\[\#1a1a1a\]\/15 {
+  border-color: color-mix(in srgb, var(--app-text) 15%, transparent) !important;
+}
+
+.dark .border-\[\#1a1a1a\]\/20 {
+  border-color: color-mix(in srgb, var(--app-text) 20%, transparent) !important;
+}
+
+.dark .bg-\[\#b7b1a9\] {
+  background-color: color-mix(in srgb, var(--app-text) 35%, transparent) !important;
 }
 
 @layer base {

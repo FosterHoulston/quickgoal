@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
@@ -27,18 +28,49 @@ export function AppShell({
   embedded = false,
 }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (embedded) return;
+
+    const shouldIgnore = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (target.isContentEditable) return true;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (shouldIgnore(event.target)) return;
+
+      if (event.key.toLowerCase() === "t") {
+        event.preventDefault();
+        router.push("/tags?create=1");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [embedded, router]);
 
   const content = (
-    <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#e6e0d8] bg-white/90">
+    <div className="flex min-h-0 flex-1 overflow-visible border border-[#e6e0d8] bg-white/90">
       <div className="grid min-h-0 flex-1 lg:grid-cols-[88px_1fr]">
-        <aside className="flex flex-col items-center gap-4 border-r border-[#e6e0d8] bg-[#fbfaf8] px-3 py-4 text-[#3a3a3a] rounded-l-2xl">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl">
+        <aside className="flex flex-col items-center gap-4 border-r border-[#e6e0d8] bg-[#fbfaf8] px-3 py-4 text-[#3a3a3a]">
+          <Link
+            href="/"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl"
+            aria-label="Dashboard"
+          >
             <img
               src="/quickgoal-icon-transparent-bg.png"
               alt="Quickgoal"
               className="h-11 w-11 object-contain"
             />
-          </div>
+          </Link>
           <div className="mt-2 flex flex-col gap-3 text-[11px] uppercase tracking-[0.24em] text-[#6b6b6b]">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -114,7 +146,7 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="flex min-h-0 flex-col gap-4 p-6">{children}</div>
+        <div className="flex min-h-0 flex-col gap-4 px-6 py-5">{children}</div>
       </div>
     </div>
   );

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { useAuth } from "@/components/AuthProvider";
+import { useGoalData } from "@/components/GoalDataProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,12 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
-
-type Tag = {
-  id: string;
-  name: string;
-  description?: string | null;
-};
+import type { Category } from "@/lib/types";
 
 const DEFAULT_TAGS = [
   { name: "Health", description: null },
@@ -30,35 +28,54 @@ const DEFAULT_TAGS = [
 ];
 
 export default function TagsPage() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { session } = useAuth();
+  const {
+    categories,
+    setCategories,
+    categoriesLoaded,
+    setCategoriesLoaded,
+    setCategoriesFromDb,
+    categoriesUserId,
+    setCategoriesUserId,
+  } = useGoalData();
+  const [loading, setLoading] = useState(!categoriesLoaded);
   const [error, setError] = useState<string | null>(null);
-  const [sessionEmail, setSessionEmail] = useState<string | undefined>();
+  const sessionEmail = session?.user.email;
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSessionEmail(data.session?.user.email);
-    });
-  }, []);
+    if (searchParams?.get("create") === "1") {
+      setCreateOpen(true);
+      router.replace("/tags", { scroll: false });
+    }
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (!supabase) return;
 
     const loadTags = async () => {
-      setLoading(true);
+      setLoading(!categoriesLoaded);
       setError(null);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
+      const userId = session?.user.id;
       if (!userId) {
-        setTags([]);
+        setCategories([]);
+        setCategoriesFromDb(false);
+        setCategoriesUserId(null);
+        setCategoriesLoaded(true);
         setLoading(false);
         return;
       }
 
+      if (categoriesLoaded && categoriesUserId === userId) {
+        setLoading(false);
+        return;
+      }
+
+      setCategoriesLoaded(false);
       const { data, error: loadError } = await supabase
         .from("categories")
         .select("id, name, description, user_id")
@@ -68,6 +85,8 @@ export default function TagsPage() {
       if (loadError) {
         setError(loadError.message);
         setLoading(false);
+        setCategoriesFromDb(false);
+        setCategoriesLoaded(true);
         return;
       }
 
@@ -95,17 +114,31 @@ export default function TagsPage() {
           .select("id, name, description, user_id")
           .eq("user_id", userId)
           .order("name");
-        setTags(reloaded ?? []);
+        setCategories((reloaded ?? []) as Category[]);
+        setCategoriesFromDb(true);
+        setCategoriesUserId(userId);
+        setCategoriesLoaded(true);
         setLoading(false);
         return;
       }
 
-      setTags(data);
+      setCategories(data as Category[]);
+      setCategoriesFromDb(true);
+      setCategoriesUserId(userId);
+      setCategoriesLoaded(true);
       setLoading(false);
     };
 
     loadTags();
-  }, []);
+  }, [
+    categoriesLoaded,
+    categoriesUserId,
+    session,
+    setCategories,
+    setCategoriesLoaded,
+    setCategoriesFromDb,
+    setCategoriesUserId,
+  ]);
 
   const handleCreate = async () => {
     if (!supabase) return;
@@ -115,8 +148,7 @@ export default function TagsPage() {
       setError("Tag name is required.");
       return;
     }
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
+    const userId = session?.user.id;
     if (!userId) {
       setError("Sign in to create tags.");
       return;
@@ -134,12 +166,15 @@ export default function TagsPage() {
       setError(insertError?.message ?? "Unable to create tag.");
       return;
     }
-    setTags((current) => [...current, data].sort((a, b) => a.name.localeCompare(b.name)));
+    setCategories((current) =>
+      [...current, data as Category].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setCategoriesFromDb(true);
     setNewName("");
     setNewDescription("");
   };
 
-  const handleUpdate = async (tag: Tag) => {
+  const handleUpdate = async (tag: Category) => {
     if (!supabase) return;
     setError(null);
     const { error: updateError } = await supabase
@@ -167,15 +202,15 @@ export default function TagsPage() {
       setError(deleteError.message);
       return;
     }
-    setTags((current) => current.filter((tag) => tag.id !== tagId));
+    setCategories((current) => current.filter((tag) => tag.id !== tagId));
   };
 
-  const hasTags = useMemo(() => tags.length > 0, [tags]);
-  const [editTag, setEditTag] = useState<Tag | null>(null);
+  const hasTags = useMemo(() => categories.length > 0, [categories]);
+  const [editTag, setEditTag] = useState<Category | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
-  const openEdit = (tag: Tag) => {
+  const openEdit = (tag: Category) => {
     setEditTag(tag);
     setEditName(tag.name);
     setEditDescription(tag.description ?? "");
@@ -184,7 +219,7 @@ export default function TagsPage() {
   const handleEditSave = async () => {
     if (!editTag) return;
     await handleUpdate({ ...editTag, name: editName, description: editDescription });
-    setTags((current) =>
+    setCategories((current) =>
       current.map((item) =>
         item.id === editTag.id
           ? { ...item, name: editName, description: editDescription }
@@ -196,71 +231,73 @@ export default function TagsPage() {
 
   return (
     <AppShell sessionEmail={sessionEmail}>
-      <section className="flex min-h-0 flex-1 flex-col">
-        <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-          Tags
-        </div>
-        <h1 className="mt-2 text-2xl font-semibold text-[#1a1a1a]">
-          Organize your goals.
-        </h1>
-        <p className="mt-2 text-sm text-[#6b6b6b]">
-          Create and edit tags with optional descriptions.
-        </p>
-
-        <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
-              {tags.length} tags
-            </div>
-            <Button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="rounded-full bg-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#2f6f6a]"
-            >
-              Create tag
-            </Button>
+      <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-[#1a1a1a]">Tags</h1>
+            <p className="mt-2 text-sm text-[#6b6b6b]">{categories.length} total</p>
           </div>
-
-          {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
-              {error}
-            </div>
-          ) : null}
-
-          <div className="flex min-h-0 flex-1 flex-col">
-            {loading ? (
-              <div className="text-sm text-[#6b6b6b]">Loading tags...</div>
-            ) : !hasTags ? (
-              <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
-                No tags yet. Create your first tag above.
+          <Button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 rounded-full bg-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#2f6f6a]"
+          >
+            Create tag
+            <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-sm border border-[#e6e0d8] bg-white font-mono leading-none text-[#1a1a1a] shadow-sm normal-case tracking-normal">
+              T
+            </span>
+          </Button>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
+            {error ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+                {error}
               </div>
-            ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
-                <div className="columns-1 gap-3 md:columns-2">
-                {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    type="button"
-                    onClick={() => openEdit(tag)}
-                    className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-left transition hover:border-[#2f6f6a]"
-                  >
-                    <div className="text-lg font-semibold text-[#1a1a1a]">
-                      {tag.name}
-                    </div>
-                    <p className="text-sm text-[#6b6b6b]">
-                      {tag.description || "No description yet. Click to add one."}
-                    </p>
-                  </button>
-                ))}
+            ) : null}
+
+            <div className="flex min-h-0 flex-1 flex-col">
+              {loading ? (
+                <div className="text-sm text-[#6b6b6b]">Loading tags...</div>
+              ) : !hasTags ? (
+                <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                  No tags yet. Create your first tag above.
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+                  <div className="columns-1 gap-3 md:columns-2">
+                  {categories.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => openEdit(tag)}
+                      className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-left transition hover:border-[#2f6f6a] dark:hover:border-white"
+                    >
+                      <div className="text-lg font-semibold text-[#1a1a1a]">
+                        {tag.name}
+                      </div>
+                      <p className="text-sm text-[#6b6b6b]">
+                        {tag.description || "No description yet. Click to add one."}
+                      </p>
+                    </button>
+                  ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </section>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="rounded-3xl border border-[#e6e0d8] bg-white p-6">
+        <DialogContent
+          className="rounded-3xl border border-[#e6e0d8] bg-white p-6"
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            handleCreate();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Create tag</DialogTitle>
             <DialogDescription>
