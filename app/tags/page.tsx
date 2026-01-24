@@ -46,6 +46,22 @@ export default function TagsPage() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [toasts, setToasts] = useState<
+    { id: string; message: string; tone?: "default" | "success" | "error" }[]
+  >([]);
+
+  const pushToast = (
+    message: string,
+    tone: "default" | "success" | "error" = "default",
+  ) => {
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current, { id, message, tone }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 4000);
+  };
 
   useEffect(() => {
     if (searchParams?.get("create") === "1") {
@@ -146,13 +162,16 @@ export default function TagsPage() {
     const name = newName.trim();
     if (!name) {
       setError("Tag name is required.");
+      pushToast("Tag name is required.", "error");
       return;
     }
     const userId = session?.user.id;
     if (!userId) {
       setError("Sign in to create tags.");
+      pushToast("Sign in to create tags.", "error");
       return;
     }
+    setCreateOpen(false);
     const { data, error: insertError } = await supabase
       .from("categories")
       .insert({
@@ -164,6 +183,7 @@ export default function TagsPage() {
       .single();
     if (insertError || !data) {
       setError(insertError?.message ?? "Unable to create tag.");
+      pushToast(insertError?.message ?? "Unable to create tag.", "error");
       return;
     }
     setCategories((current) =>
@@ -172,6 +192,7 @@ export default function TagsPage() {
     setCategoriesFromDb(true);
     setNewName("");
     setNewDescription("");
+    pushToast("Tag created.", "success");
   };
 
   const handleUpdate = async (tag: Category) => {
@@ -186,8 +207,10 @@ export default function TagsPage() {
       .eq("id", tag.id);
     if (updateError) {
       setError(updateError.message);
+      pushToast(updateError.message, "error");
       return;
     }
+    pushToast("Tag updated.", "success");
   };
 
   const handleDelete = async (tagId: string) => {
@@ -200,9 +223,11 @@ export default function TagsPage() {
       .eq("id", tagId);
     if (deleteError) {
       setError(deleteError.message);
+      pushToast(deleteError.message, "error");
       return;
     }
     setCategories((current) => current.filter((tag) => tag.id !== tagId));
+    pushToast("Tag deleted.", "success");
   };
 
   const hasTags = useMemo(() => categories.length > 0, [categories]);
@@ -218,6 +243,7 @@ export default function TagsPage() {
 
   const handleEditSave = async () => {
     if (!editTag) return;
+    setEditTag(null);
     await handleUpdate({ ...editTag, name: editName, description: editDescription });
     setCategories((current) =>
       current.map((item) =>
@@ -226,41 +252,40 @@ export default function TagsPage() {
           : item,
       ),
     );
-    setEditTag(null);
   };
 
   return (
     <AppShell sessionEmail={sessionEmail}>
-      <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
+      <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div>
-            <h1 className="text-2xl font-semibold text-[#1a1a1a]">Tags</h1>
-            <p className="mt-2 text-sm text-[#6b6b6b]">{categories.length} total</p>
+            <h1 className="text-2xl font-semibold text-[color:var(--color-text)]">Tags</h1>
+            <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">{categories.length} total</p>
           </div>
           <Button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#2f6f6a]"
+            className="flex items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
           >
             Create tag
-            <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-sm border border-[#e6e0d8] bg-white font-mono leading-none text-[#1a1a1a] shadow-sm normal-case tracking-normal">
-              T
+            <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
+              t
             </span>
           </Button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
           <div className="flex min-h-0 flex-1 flex-col gap-4">
             {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+              <div className="rounded-2xl border border-[color:var(--color-danger-soft)] bg-[color:var(--color-danger-soft-2)] px-4 py-2 text-xs text-[color:var(--color-danger-strong)]">
                 {error}
               </div>
             ) : null}
 
             <div className="flex min-h-0 flex-1 flex-col">
               {loading ? (
-                <div className="text-sm text-[#6b6b6b]">Loading tags...</div>
+                <div className="text-sm text-[color:var(--color-text-muted)]">Loading tags...</div>
               ) : !hasTags ? (
-                <div className="rounded-2xl border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                <div className="rounded-2xl border border-dashed border-[color:var(--color-border)] p-6 text-sm text-[color:var(--color-text-muted)]">
                   No tags yet. Create your first tag above.
                 </div>
               ) : (
@@ -271,12 +296,12 @@ export default function TagsPage() {
                       key={tag.id}
                       type="button"
                       onClick={() => openEdit(tag)}
-                      className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-left transition hover:border-[#2f6f6a] dark:hover:border-white"
+                    className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-left transition hover:border-[color:var(--color-accent)]"
                     >
-                      <div className="text-lg font-semibold text-[#1a1a1a]">
+                      <div className="text-lg font-semibold text-[color:var(--color-text)]">
                         {tag.name}
                       </div>
-                      <p className="text-sm text-[#6b6b6b]">
+                      <p className="text-sm text-[color:var(--color-text-muted)]">
                         {tag.description || "No description yet. Click to add one."}
                       </p>
                     </button>
@@ -291,7 +316,7 @@ export default function TagsPage() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent
-          className="rounded-3xl border border-[#e6e0d8] bg-white p-6"
+          className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6"
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();
@@ -309,19 +334,19 @@ export default function TagsPage() {
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
               placeholder="Tag name"
-              className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm"
+              className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm"
             />
             <Input
               value={newDescription}
               onChange={(event) => setNewDescription(event.target.value)}
               placeholder="Optional description"
-              className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm"
+              className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm"
             />
             <div className="mt-2 flex flex-wrap gap-3">
               <Button
                 type="button"
                 onClick={handleCreate}
-                className="rounded-full bg-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#2f6f6a]"
+                className="rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
               >
                 Create
               </Button>
@@ -329,7 +354,7 @@ export default function TagsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setCreateOpen(false)}
-                className="rounded-full border-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1a1a1a]"
+                className="rounded-full border-[color:var(--color-ink)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)]"
               >
                 Cancel
               </Button>
@@ -339,7 +364,7 @@ export default function TagsPage() {
       </Dialog>
 
       <Dialog open={!!editTag} onOpenChange={() => setEditTag(null)}>
-        <DialogContent className="rounded-3xl border border-[#e6e0d8] bg-white p-6">
+        <DialogContent className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6">
           <DialogHeader>
             <DialogTitle>Edit tag</DialogTitle>
             <DialogDescription>
@@ -351,19 +376,19 @@ export default function TagsPage() {
               value={editName}
               onChange={(event) => setEditName(event.target.value)}
               placeholder="Tag name"
-              className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm"
+              className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm"
             />
             <Input
               value={editDescription}
               onChange={(event) => setEditDescription(event.target.value)}
               placeholder="Optional description"
-              className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm"
+              className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm"
             />
             <div className="mt-2 flex flex-wrap gap-3">
               <Button
                 type="button"
                 onClick={handleEditSave}
-                className="rounded-full bg-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-[#2f6f6a]"
+                className="rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
               >
                 Save
               </Button>
@@ -371,7 +396,7 @@ export default function TagsPage() {
                 type="button"
                 variant="outline"
                 onClick={() => setEditTag(null)}
-                className="rounded-full border-[#1a1a1a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#1a1a1a]"
+                className="rounded-full border-[color:var(--color-ink)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)]"
               >
                 Cancel
               </Button>
@@ -380,7 +405,7 @@ export default function TagsPage() {
                   type="button"
                   variant="outline"
                   onClick={() => handleDelete(editTag.id)}
-                  className="rounded-full border-[#8b4a3a] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[#8b4a3a]"
+                  className="rounded-full border-[color:var(--color-danger-strong)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-danger-strong)]"
                 >
                   Delete
                 </Button>
@@ -389,6 +414,23 @@ export default function TagsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <div className="fixed bottom-6 right-6 z-50 flex w-[280px] flex-col gap-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`toast-fade rounded-2xl border px-4 py-3 text-xs shadow-lg ${
+              toast.tone === "success"
+                ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                : toast.tone === "error"
+                  ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
+                  : "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </AppShell>
   );
 }

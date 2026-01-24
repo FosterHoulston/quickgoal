@@ -453,6 +453,7 @@ export default function Home() {
 
   const handleSave = async () => {
     if (!canSave) return;
+    setNewGoalOpen(false);
     setGoalsError(null);
     setSaveNotice(null);
     const createdAt = (draftStartedAt ?? new Date()).toISOString();
@@ -511,7 +512,6 @@ export default function Home() {
     resetForm();
     setSaveNotice("Goal saved.");
     pushToast("Goal created.", "success");
-    setNewGoalOpen(false);
   };
 
   const orderedGoals = useMemo(() => goals, [goals]);
@@ -554,6 +554,10 @@ export default function Home() {
         goal.id === goalId ? { ...goal, outcome: nextOutcome } : goal,
       ),
     );
+    pushToast(
+      nextOutcome === "passed" ? "Marked as passed." : "Marked as failed.",
+      "success",
+    );
   };
 
   const openEditGoal = (goal: Goal) => {
@@ -574,8 +578,8 @@ export default function Home() {
     }
   };
 
-  const closeEditGoal = () => {
-    if (editSaving || editDeleting) return;
+  const closeEditGoal = (force = false) => {
+    if (!force && (editSaving || editDeleting)) return;
     setEditGoal(null);
     setEditTitle("");
     setEditOutcome(null);
@@ -596,6 +600,7 @@ export default function Home() {
     if (!editGoal || !supabase || !session) return;
     setEditSaving(true);
     setGoalsError(null);
+    closeEditGoal(true);
 
     const endAtValue = editHasEndAt && editEndAt ? new Date(editEndAt).toISOString() : null;
 
@@ -665,7 +670,6 @@ export default function Home() {
     );
 
     setEditSaving(false);
-    closeEditGoal();
     pushToast("Goal updated.", "success");
   };
 
@@ -765,7 +769,7 @@ export default function Home() {
       } else {
         setHoverCard({ id: goalId, top: 0 });
       }
-    }, 500);
+    }, 800);
   };
 
   const handleRowLeave = () => {
@@ -784,35 +788,35 @@ export default function Home() {
   return (
     <>
       {!session ? (
-        <div className="min-h-screen px-6 py-8 text-[15px] text-[#1a1a1a]">
+        <div className="min-h-screen px-6 py-8 text-[15px] text-[color:var(--color-text)]">
           <main className="mx-auto flex w-full max-w-6xl flex-col gap-5">
             <header className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[#6b6b6b]">
-                <span className="rounded-full border border-[#e6e0d8] px-3 py-1">
+              <div className="flex flex-wrap items-center gap-3 text-sm uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
+                <span className="rounded-full border border-[color:var(--color-border)] px-3 py-1">
                   Quickgoal
                 </span>
                 <span>Capture the moment, build momentum.</span>
               </div>
-              <h1 className="max-w-3xl font-[var(--font-fraunces)] text-3xl leading-tight text-[#1a1a1a] md:text-4xl">
+              <h1 className="max-w-3xl font-[var(--font-fraunces)] text-3xl leading-tight text-[color:var(--color-text)] md:text-4xl">
                 A calm space for goals — with timestamps that start the instant you
                 begin.
               </h1>
             </header>
 
             <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <section className="rounded-2xl border border-[#e6e0d8] bg-white/90 p-6">
+              <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:rgba(var(--color-surface-rgb),0.9)] p-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Sign in</h2>
-                  <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                  <span className="text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
                     Required
                   </span>
                 </div>
-                <p className="mt-2 text-sm text-[#6b6b6b]">
+                <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
                   Sign in to access your goals dashboard and keep your progress synced.
                 </p>
-                <div className="mt-6 flex flex-col gap-4 text-sm text-[#3a3a3a]">
+                <div className="mt-6 flex flex-col gap-4 text-sm text-[color:var(--color-text-subtle)]">
                   {!authReady ? (
-                    <span className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                    <span className="text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
                       Checking session...
                     </span>
                   ) : (
@@ -820,12 +824,12 @@ export default function Home() {
                       <Button
                         type="button"
                         onClick={handleGoogleSignIn}
-                        className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
+                        className="rounded-full bg-[color:var(--color-button)] px-6 py-3 text-sm font-semibold text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
                       >
                         Continue with Google
                       </Button>
                       <div className="flex flex-col gap-2">
-                        <label className="text-xs uppercase tracking-[0.2em] text-[#6b6b6b]">
+                        <label className="text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
                           Email
                         </label>
                         <Input
@@ -833,13 +837,13 @@ export default function Home() {
                           value={email}
                           onChange={(event) => setEmail(event.target.value)}
                           placeholder="you@example.com"
-                          className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
+                          className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)]"
                         />
                         <Button
                           type="button"
                           onClick={handleEmailSignIn}
                           variant="outline"
-                          className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+                          className="rounded-full border-[color:var(--color-ink)] px-5 py-3 text-sm font-medium text-[color:var(--color-text)] transition hover:border-[color:var(--color-accent)]"
                         >
                           Email me a sign-in link
                         </Button>
@@ -847,25 +851,25 @@ export default function Home() {
                     </>
                   )}
                   {authError ? (
-                    <span className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+                    <span className="rounded-2xl border border-[color:var(--color-danger-soft)] bg-[color:var(--color-danger-soft-2)] px-4 py-2 text-xs text-[color:var(--color-danger-strong)]">
                       {authError}
                     </span>
                   ) : null}
                   {authNotice ? (
-                    <span className="rounded-2xl border border-[#e6e0d8] bg-white px-4 py-2 text-xs text-[#6b6b6b]">
+                    <span className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-4 py-2 text-xs text-[color:var(--color-text-muted)]">
                       {authNotice}
                     </span>
                   ) : null}
                   {!supabase ? (
-                    <span className="text-xs text-[#6b6b6b]">
+                    <span className="text-xs text-[color:var(--color-text-muted)]">
                       Add your Supabase env vars to enable auth.
                     </span>
                   ) : null}
                 </div>
               </section>
-              <section className="rounded-2xl border border-[#e6e0d8] bg-white/70 p-6">
+              <section className="rounded-2xl border border-[color:var(--color-border)] bg-[color:rgba(var(--color-surface-rgb),0.7)] p-6">
                 <h2 className="text-lg font-semibold">Why Quickgoal?</h2>
-                <ul className="mt-4 space-y-3 text-sm text-[#6b6b6b]">
+                <ul className="mt-4 space-y-3 text-sm text-[color:var(--color-text-muted)]">
                   <li>Capture goals fast with instant timestamps.</li>
                   <li>Optional end dates keep you time-aware.</li>
                   <li>Track wins and misses in one calm space.</li>
@@ -876,23 +880,23 @@ export default function Home() {
         </div>
       ) : (
         <AppShell sessionEmail={session.user.email} onSignOut={handleSignOut}>
-          <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e0d8] px-6 py-3">
+          <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[color:var(--color-border)] px-6 py-3">
                 <div>
-                  <h2 className="text-2xl font-semibold text-[#1a1a1a]">
+                  <h2 className="text-2xl font-semibold text-[color:var(--color-text)]">
                     Dashboard
                   </h2>
-                  <p className="mt-2 text-sm text-[#6b6b6b]">
+                  <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
                     {orderedGoals.length} total
                   </p>
                 </div>
                 <Button
                   type="button"
                   onClick={() => setNewGoalOpen(true)}
-                  className="flex items-center gap-2 rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a]"
+                  className="flex items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
                 >
                   Create goal
-                  <span className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-sm border border-[#e6e0d8] bg-white font-mono leading-none text-[#1a1a1a] shadow-sm normal-case tracking-normal">
+                  <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
                     G
                   </span>
                 </Button>
@@ -901,23 +905,23 @@ export default function Home() {
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex min-h-0 flex-1 flex-col">
                     {goalsLoading ? (
-                      <div className="px-6 py-4 text-sm text-[#6b6b6b]">
+                      <div className="px-6 py-4 text-sm text-[color:var(--color-text-muted)]">
                         Loading goals...
                       </div>
                     ) : orderedGoals.length === 0 ? (
-                      <div className="px-6 py-4 text-sm text-[#6b6b6b]">
+                      <div className="px-6 py-4 text-sm text-[color:var(--color-text-muted)]">
                         {session
                           ? "No goals yet. Use Create goal to add one."
                           : "Sign in to view your goals."}
                       </div>
                     ) : (
-                    <div className="relative min-h-0 flex-1">
+                    <div className="relative flex min-h-0 flex-1 flex-col">
                       <div
                         ref={tableContainerRef}
                         className="min-h-0 flex-1 overflow-y-auto"
                       >
                         <table className="w-full table-fixed text-left text-sm">
-                        <thead className="sticky top-0 z-10 bg-[#f7f5f1] text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                        <thead className="sticky top-0 z-10 bg-[color:var(--color-surface-alt)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
                           <tr>
                             <th className="w-[40%] px-4 py-2.5 font-medium">Goal</th>
                             <th className="w-[20%] px-4 py-2.5 font-medium">Start</th>
@@ -949,26 +953,26 @@ export default function Home() {
                                 }
                               }}
                               aria-disabled={!isAuthed}
-                              className={`h-11 border-t border-[#f1f0ec] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2f6f6a] ${
+                              className={`h-11 border-t border-[color:var(--color-surface-subtle)] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-ring-40)] ${
                                 goal.outcome === "passed"
-                                  ? "shadow-[inset_4px_0_0_0_#2f6f6a] hover:bg-[#f4faf8] dark:hover:bg-[#1f2e2b]"
+                                  ? "shadow-[inset_4px_0_0_0_var(--color-accent)] hover:bg-[color:var(--color-success-soft)]"
                                   : goal.outcome === "failed"
-                                    ? "shadow-[inset_4px_0_0_0_#8b4a3a] hover:bg-[#fbf4f2] dark:hover:bg-[#2b1f1c]"
-                                    : "hover:bg-[#fbfaf8] dark:hover:bg-[#1c2027]"
+                                    ? "shadow-[inset_4px_0_0_0_var(--color-danger-strong)] hover:bg-[color:var(--color-danger-soft-2)]"
+                                    : "hover:bg-[color:var(--color-surface-muted)]"
                               }`}
                             >
-                              <td className="px-4 py-2 text-[#1a1a1a]">
+                              <td className="px-4 py-2 text-[color:var(--color-text)]">
                                 <div className="flex items-center gap-2 truncate font-semibold">
                                   {goal.outcome === "passed" ? (
                                     <span
-                                      className="text-[#2f6f6a]"
+                                      className="text-[color:var(--color-accent)]"
                                       aria-hidden="true"
                                     >
                                       ✓
                                     </span>
                                   ) : goal.outcome === "failed" ? (
                                     <span
-                                      className="text-[#8b4a3a]"
+                                      className="text-[color:var(--color-danger-strong)]"
                                       aria-hidden="true"
                                     >
                                       x
@@ -977,24 +981,24 @@ export default function Home() {
                                   <span className="truncate">{goal.title}</span>
                                 </div>
                               </td>
-                              <td className="px-4 py-2 text-xs text-[#6b6b6b]">
+                              <td className="px-4 py-2 text-xs text-[color:var(--color-text-muted)]">
                                 {formatTimestamp(goal.createdAt)}
                               </td>
-                              <td className="px-4 py-2 text-xs text-[#6b6b6b]">
+                              <td className="px-4 py-2 text-xs text-[color:var(--color-text-muted)]">
                                 {goal.endAt ? (
                                   <span className="truncate">
                                     {formatTimestamp(goal.endAt)}
                                   </span>
                                 ) : (
-                                  <span className="text-[#b7b1a9]">—</span>
+                                  <span className="text-[color:var(--color-text-disabled)]">—</span>
                                 )}
                               </td>
-                              <td className="px-4 py-2 text-[10px] text-[#6b6b6b]">
+                              <td className="px-4 py-2 text-[10px] text-[color:var(--color-text-muted)]">
                                 {goal.categories.length > 0 ? (
                                   <div className="flex items-center gap-1.5 truncate uppercase tracking-[0.16em]">
-                                    {goal.categories.slice(0, 2).map((category) => (
+                                    {goal.categories.slice(0, 2).map((category, index) => (
                                       <span
-                                        key={`${goal.id}-${category}`}
+                                        key={`${goal.id}-${category}-${index}`}
                                         className="truncate"
                                       >
                                         {category}
@@ -1039,13 +1043,13 @@ export default function Home() {
                                   if (!isAuthed) return;
                                   openEditGoal(goal);
                                 }}
-                                className="rounded-2xl border border-[#e6e0d8] bg-white p-4 shadow-xl"
+                                className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 shadow-xl"
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <div className="text-sm font-semibold text-[#1a1a1a]">
+                                  <div className="text-sm font-semibold text-[color:var(--color-text)]">
                                     {goal.title}
                                   </div>
-                                  <div className="text-[11px] uppercase tracking-[0.18em] text-[#6b6b6b]">
+                                  <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
                                     {goal.outcome
                                       ? goal.outcome === "passed"
                                         ? "Passed"
@@ -1053,7 +1057,7 @@ export default function Home() {
                                       : "Unscored"}
                                   </div>
                                 </div>
-                                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[#6b6b6b]">
+                                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[color:var(--color-text-muted)]">
                                   <span>Started {formatTimestamp(goal.createdAt)}</span>
                                   {goal.endAt ? (
                                     <span>
@@ -1067,11 +1071,11 @@ export default function Home() {
                                 </div>
                                 {goal.categories.length > 0 ? (
                                   <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-                                    {goal.categories.map((category) => (
+                                    {goal.categories.map((category, index) => (
                                       <Badge
-                                        key={`${goal.id}-${category}`}
+                                        key={`${goal.id}-${category}-${index}`}
                                         variant="outline"
-                                        className="rounded-full border-[#e6e0d8] bg-white px-2 py-0.5 uppercase tracking-[0.16em] text-[#3a3a3a]"
+                                        className="rounded-full border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-0.5 uppercase tracking-[0.16em] text-[color:var(--color-text-subtle)]"
                                       >
                                         {category}
                                       </Badge>
@@ -1088,7 +1092,7 @@ export default function Home() {
                                       }}
                                       disabled={!isAuthed}
                                       variant="outline"
-                                      className="h-auto rounded-full border-[#2f6f6a] bg-[#e7f1ef] px-3 py-1 uppercase tracking-[0.14em] text-[#2f6f6a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                      className="h-auto rounded-full border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] px-3 py-1 uppercase tracking-[0.14em] text-[color:var(--color-accent)] transition disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                       Pass
                                     </Button>
@@ -1100,7 +1104,7 @@ export default function Home() {
                                       }}
                                       disabled={!isAuthed}
                                       variant="outline"
-                                      className="h-auto rounded-full border-[#8b4a3a] bg-[#f3e6e2] px-3 py-1 uppercase tracking-[0.14em] text-[#8b4a3a] transition disabled:cursor-not-allowed disabled:opacity-60"
+                                      className="h-auto rounded-full border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] px-3 py-1 uppercase tracking-[0.14em] text-[color:var(--color-danger-strong)] transition disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                       Fail
                                     </Button>
@@ -1115,14 +1119,14 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="border-t border-[#e6e0d8] px-6 py-4">
+                <div className="border-t border-[color:var(--color-border)] px-6 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Select
                         value={String(selectedYear)}
                         onValueChange={(value) => setSelectedYear(Number(value))}
                       >
-                        <SelectTrigger className="h-8 w-[88px] justify-center rounded-full border-[#1a1a1a]/20 px-2 text-[10px] uppercase tracking-[0.2em]">
+                        <SelectTrigger className="h-8 w-[88px] justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
                           <SelectValue placeholder="Year" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1137,17 +1141,20 @@ export default function Home() {
                   </div>
                   <div className="mt-2">
                     {dailyGrid.weeks.length === 0 ? (
-                      <div className="border border-dashed border-[#e6e0d8] p-6 text-sm text-[#6b6b6b]">
+                      <div className="border border-dashed border-[color:var(--color-border)] p-6 text-sm text-[color:var(--color-text-muted)]">
                         No completed goals yet. Mark a goal as passed or failed to see
                         progress.
                       </div>
                     ) : (
                       <div className="grid grid-cols-[auto_1fr] gap-3">
-                        <div className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[#6b6b6b]">
+                        <div
+                          className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[color:var(--color-text-muted)]"
+                          style={{ gridTemplateRows: "repeat(7, 12px)" }}
+                        >
                           {["Mon", "Wed", "Fri"].map((day, index) => (
                             <span
                               key={day}
-                              className="h-3 leading-3"
+                              className="flex h-4.5 items-end pb-[0px] leading-none"
                               style={{ gridRowStart: 2 + index * 2 }}
                             >
                               {day}
@@ -1155,7 +1162,7 @@ export default function Home() {
                           ))}
                         </div>
                         <div className="w-fit max-w-full">
-                          <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[#6b6b6b]">
+                          <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[color:var(--color-text-muted)]">
                             {dailyGrid.monthLabels.map((label) => (
                               <span
                                 key={`${label.index}-${label.label}`}
@@ -1187,11 +1194,11 @@ export default function Home() {
                                           0.35 +
                                             total / Math.max(1, dailyGrid.maxTotal),
                                         );
-                                  const green = `rgba(47, 179, 106, ${intensity})`;
-                                  const red = `rgba(227, 83, 63, ${intensity})`;
+                                  const green = `rgb(var(--color-success-rgb) / ${intensity})`;
+                                  const red = `rgb(var(--color-danger-rgb) / ${intensity})`;
                                   const background =
                                       total === 0
-                                        ? "var(--app-surface-subtle)"
+                                        ? "var(--color-surface-subtle)"
                                         : `linear-gradient(90deg, ${green} ${Math.round(
                                             passRatio * 100,
                                           )}%, ${red} ${Math.round(
@@ -1200,7 +1207,7 @@ export default function Home() {
                                   return (
                                     <span
                                       key={cell.key}
-                                      className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                      className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
                                       style={{ background }}
                                       title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
                                     />
@@ -1209,25 +1216,25 @@ export default function Home() {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[#6b6b6b]">
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[color:var(--color-text-muted)]">
                             <div className="flex items-center gap-2">
                               <span>Passed</span>
                               <div className="flex items-center gap-2">
                                 {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
                                   const background =
                                     passRatio === 1
-                                      ? "#2fb36a"
+                                      ? "var(--color-success)"
                                       : passRatio === 0
-                                        ? "#e3533f"
-                                        : `linear-gradient(90deg, #2fb36a ${Math.round(
+                                        ? "var(--color-danger)"
+                                        : `linear-gradient(90deg, var(--color-success) ${Math.round(
                                             passRatio * 100,
-                                          )}%, #e3533f ${Math.round(
+                                          )}%, var(--color-danger) ${Math.round(
                                             passRatio * 100,
                                           )}%)`;
                                   return (
                                     <span
                                       key={`pf-${index}`}
-                                      className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                      className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
                                       style={{ background }}
                                     />
                                   );
@@ -1241,12 +1248,12 @@ export default function Home() {
                                 {[0, 0.35, 0.55, 0.75, 1].map((step) => (
                                   <span
                                     key={`legend-${step}`}
-                                    className="h-3 w-3 rounded-[4px] border border-[#e6e0d8]"
+                                    className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
                                     style={{
                                       background:
                                         step === 0
-                                          ? "var(--app-surface-subtle)"
-                                          : `linear-gradient(90deg, rgba(47, 179, 106, ${step}) 50%, rgba(227, 83, 63, ${step}) 50%)`,
+                                          ? "var(--color-surface-subtle)"
+                                          : `linear-gradient(90deg, rgb(var(--color-success-rgb) / ${step}) 50%, rgb(var(--color-danger-rgb) / ${step}) 50%)`,
                                   }}
                                 />
                                 ))}
@@ -1273,12 +1280,12 @@ export default function Home() {
         {editGoal ? (
           <DialogContent
             showCloseButton={false}
-            className="w-full max-w-2xl rounded-3xl border-[#e6e0d8] bg-white p-5 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]"
+            className="w-full max-w-2xl rounded-3xl border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]"
           >
             <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
               <div>
                 <DialogTitle>Edit goal</DialogTitle>
-                <DialogDescription className="text-xs text-[#6b6b6b]">
+                <DialogDescription className="text-xs text-[color:var(--color-text-muted)]">
                   Started {formatTimestamp(editGoal.createdAt)}
                 </DialogDescription>
               </div>
@@ -1286,7 +1293,7 @@ export default function Home() {
                 type="button"
                 onClick={closeEditGoal}
                 variant="outline"
-                className="rounded-full border-[#e6e0d8] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#6b6b6b]"
+                className="rounded-full border-[color:var(--color-border)] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]"
               >
                 Close
               </Button>
@@ -1294,17 +1301,17 @@ export default function Home() {
 
             <div className="mt-2 flex flex-col gap-5">
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-[#3a3a3a]">Goal</span>
+                <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">Goal</span>
                 <Input
                   value={editTitle}
                   onChange={(event) => setEditTitle(event.target.value)}
                   placeholder="Update your goal..."
-                  className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-base shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
+                  className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-base shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)]"
                 />
               </label>
 
               <div className="flex flex-col gap-3">
-                <span className="text-sm font-medium text-[#3a3a3a]">
+                <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">
                   Outcome
                 </span>
                 <div className="flex gap-3">
@@ -1315,8 +1322,8 @@ export default function Home() {
                     variant="outline"
                     className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
                       editOutcome === "passed"
-                        ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
-                        : "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                        ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
+                        : "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
                     }`}
                   >
                     Pass
@@ -1328,8 +1335,8 @@ export default function Home() {
                     variant="outline"
                     className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
                       editOutcome === "failed"
-                        ? "border-[#8b4a3a] bg-[#8b4a3a] text-white shadow-sm"
-                        : "border-[#8b4a3a] bg-[#f3e6e2] text-[#8b4a3a]"
+                        ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-strong)] text-[color:var(--color-button-text)] shadow-sm"
+                        : "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
                     }`}
                   >
                     Fail
@@ -1345,8 +1352,8 @@ export default function Home() {
                     variant="outline"
                     className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                       editHasEndAt
-                        ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
-                        : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a]"
+                        ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                        : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
                     }`}
                   >
                     <span>End date/time</span>
@@ -1359,13 +1366,13 @@ export default function Home() {
                       type="datetime-local"
                       value={editEndAt}
                       onChange={(event) => setEditEndAt(event.target.value)}
-                      className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40"
+                      className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)]"
                     />
                   ) : null}
               </div>
 
               <div className="flex flex-col gap-3">
-                <span className="text-sm font-medium text-[#3a3a3a]">
+                <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">
                   Categories
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -1380,8 +1387,8 @@ export default function Home() {
                         variant="outline"
                         className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                           selected
-                            ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
-                            : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                            ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
+                            : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-accent)]"
                         }`}
                       >
                         {category.name}
@@ -1398,7 +1405,7 @@ export default function Home() {
                   type="button"
                   onClick={handleUpdateGoal}
                   disabled={editSaving || editTitle.trim().length === 0}
-                  className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#b7b1a9]"
+                  className="rounded-full bg-[color:var(--color-button)] px-6 py-3 text-sm font-semibold text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-text-disabled)]"
                 >
                   {editSaving ? "Saving..." : "Save changes"}
                 </Button>
@@ -1407,7 +1414,7 @@ export default function Home() {
                   onClick={closeEditGoal}
                   disabled={editSaving || editDeleting}
                   variant="outline"
-                  className="rounded-full border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#3a3a3a] transition hover:border-[#2f6f6a] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border-[color:var(--color-border)] px-5 py-3 text-sm font-medium text-[color:var(--color-text-subtle)] transition hover:border-[color:var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancel
                 </Button>
@@ -1417,7 +1424,7 @@ export default function Home() {
                 onClick={handleDeleteGoal}
                 disabled={editDeleting}
                 variant="outline"
-                className="rounded-full border-[#e6e0d8] px-5 py-3 text-sm font-medium text-[#8b4a3a] transition hover:border-[#8b4a3a] disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border-[color:var(--color-border)] px-5 py-3 text-sm font-medium text-[color:var(--color-danger-strong)] transition hover:border-[color:var(--color-danger-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {editDeleting ? "Deleting..." : "Delete goal"}
               </Button>
@@ -1432,7 +1439,7 @@ export default function Home() {
       >
         <DialogContent
           showCloseButton={false}
-          className="w-full max-w-2xl rounded-3xl border-[#e6e0d8] bg-white p-5 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.7)]"
+          className="w-full max-w-2xl rounded-3xl border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]"
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
             event.preventDefault();
@@ -1443,11 +1450,11 @@ export default function Home() {
             <div>
               <DialogTitle>New goal</DialogTitle>
               {draftStartedAt ? (
-                <DialogDescription className="text-xs text-[#6b6b6b]">
+                <DialogDescription className="text-xs text-[color:var(--color-text-muted)]">
                   Started {formatTimestamp(draftStartedAt)}
                 </DialogDescription>
               ) : (
-                <DialogDescription className="text-xs text-[#6b6b6b]">
+                <DialogDescription className="text-xs text-[color:var(--color-text-muted)]">
                   Start typing to timestamp
                 </DialogDescription>
               )}
@@ -1456,7 +1463,7 @@ export default function Home() {
               type="button"
               onClick={() => setNewGoalOpen(false)}
               variant="outline"
-              className="rounded-full border-[#e6e0d8] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[#6b6b6b]"
+              className="rounded-full border-[color:var(--color-border)] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]"
             >
               Close
             </Button>
@@ -1464,13 +1471,13 @@ export default function Home() {
 
           <div className="mt-2 flex flex-col gap-5">
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-[#3a3a3a]">Goal</span>
+              <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">Goal</span>
               <Input
                 value={title}
                 onChange={(event) => handleTitleChange(event.target.value)}
                 placeholder="Write a clear, short goal..."
                 disabled={!isAuthed}
-                className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-base shadow-sm transition focus-visible:ring-[#2f6f6a]/40 disabled:bg-[#f1f0ec]"
+                className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-base shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)] disabled:bg-[color:var(--color-surface-subtle)]"
               />
             </label>
 
@@ -1483,8 +1490,8 @@ export default function Home() {
                 variant="outline"
                 className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                   hasEndAt
-                    ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
-                    : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a]"
+                    ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                    : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 <span>End date/time</span>
@@ -1498,13 +1505,13 @@ export default function Home() {
                   value={endAt}
                   onChange={(event) => setEndAt(event.target.value)}
                   disabled={!isAuthed}
-                  className="h-auto rounded-2xl border-[#1a1a1a]/15 bg-white px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[#2f6f6a]/40 disabled:bg-[#f1f0ec]"
+                  className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)] disabled:bg-[color:var(--color-surface-subtle)]"
                 />
               ) : null}
             </div>
 
             <div className="flex flex-col gap-3">
-              <span className="text-sm font-medium text-[#3a3a3a]">
+              <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">
                 Categories
               </span>
               <div className="flex flex-wrap gap-2">
@@ -1520,8 +1527,8 @@ export default function Home() {
                       variant="outline"
                       className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                         selected
-                          ? "border-[#2f6f6a] bg-[#2f6f6a] text-white shadow-sm"
-                          : "border-[#1a1a1a]/15 bg-white text-[#3a3a3a] hover:border-[#2f6f6a]"
+                          ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
+                          : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-accent)]"
                       } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
                       {category.name}
@@ -1536,7 +1543,7 @@ export default function Home() {
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
-                className="rounded-full bg-[#1a1a1a] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#2f6f6a] disabled:cursor-not-allowed disabled:bg-[#b7b1a9]"
+                className="rounded-full bg-[color:var(--color-button)] px-6 py-3 text-sm font-semibold text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-text-disabled)]"
               >
                 Save goal
               </Button>
@@ -1544,20 +1551,20 @@ export default function Home() {
                 type="button"
                 onClick={resetForm}
                 variant="outline"
-                className="rounded-full border-[#1a1a1a] px-5 py-3 text-sm font-medium text-[#1a1a1a] transition hover:border-[#2f6f6a]"
+                className="rounded-full border-[color:var(--color-ink)] px-5 py-3 text-sm font-medium text-[color:var(--color-text)] transition hover:border-[color:var(--color-accent)]"
               >
                 Clear
               </Button>
-              <span className="text-xs text-[#6b6b6b]">
+              <span className="text-xs text-[color:var(--color-text-muted)]">
                 {session
                   ? "Goals are timestamped on first input."
                   : "Sign in to save goals."}
               </span>
               {saveNotice ? (
-                <span className="text-xs text-[#2f6f6a]">{saveNotice}</span>
+                <span className="text-xs text-[color:var(--color-accent)]">{saveNotice}</span>
               ) : null}
               {goalsError ? (
-                <span className="text-xs text-red-600">{goalsError}</span>
+                <span className="text-xs text-[color:var(--color-danger-strong)]">{goalsError}</span>
               ) : null}
             </div>
           </div>
@@ -1568,12 +1575,12 @@ export default function Home() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`rounded-2xl border px-4 py-3 text-xs shadow-lg ${
+            className={`toast-fade rounded-2xl border px-4 py-3 text-xs shadow-lg ${
               toast.tone === "success"
-                ? "border-[#2f6f6a] bg-[#e7f1ef] text-[#2f6f6a]"
+                ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
                 : toast.tone === "error"
-                  ? "border-[#8b4a3a] bg-[#f3e6e2] text-[#8b4a3a]"
-                  : "border-[#e6e0d8] bg-white text-[#3a3a3a]"
+                  ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
+                  : "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
             }`}
           >
             {toast.message}

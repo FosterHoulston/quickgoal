@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
+import QuickgoalIcon from "@/app/quickgoal-icon";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -57,28 +58,24 @@ export function AppShell({
   }, [embedded, router]);
 
   const content = (
-    <div className="flex min-h-0 flex-1 overflow-visible border border-[#e6e0d8] bg-white/90">
+    <div className="flex min-h-0 flex-1 overflow-visible border border-[color:var(--color-border)] bg-[color:rgba(var(--color-surface-rgb),0.9)]">
       <div className="grid min-h-0 flex-1 lg:grid-cols-[88px_1fr]">
-        <aside className="flex flex-col items-center gap-4 border-r border-[#e6e0d8] bg-[#fbfaf8] px-3 py-4 text-[#3a3a3a]">
+        <aside className="flex flex-col items-center gap-4 border-r border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] px-3 py-4 text-[color:var(--color-text-subtle)]">
           <Link
             href="/"
             className="flex h-11 w-11 items-center justify-center rounded-2xl"
             aria-label="Dashboard"
           >
-            <img
-              src="/quickgoal-icon-transparent-bg.png"
-              alt="Quickgoal"
-              className="h-11 w-11 object-contain"
-            />
+            <QuickgoalIcon size={44} />
           </Link>
-          <div className="mt-2 flex flex-col gap-3 text-[11px] uppercase tracking-[0.24em] text-[#6b6b6b]">
+          <div className="mt-2 flex flex-col gap-3 text-[11px] uppercase tracking-[0.24em] text-[color:var(--color-text-muted)]">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = item.href ? pathname === item.href : false;
               const className = `flex h-10 w-10 items-center justify-center rounded-xl transition ${
                 active
-                  ? "bg-[#e7f1ef] text-[#2f6f6a]"
-                  : "text-[#6b6b6b] hover:bg-[#f1f0ec]"
+                  ? "bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                  : "text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-subtle)]"
               }`;
 
               if (item.href) {
@@ -89,7 +86,7 @@ export function AppShell({
                     className={className}
                     aria-label={item.label}
                   >
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-5 w-5" />
                   </Link>
                 );
               }
@@ -101,7 +98,7 @@ export function AppShell({
                   className={className}
                   aria-label={item.label}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </button>
               );
             })}
@@ -111,24 +108,24 @@ export function AppShell({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[#6b6b6b] transition hover:bg-[#f1f0ec]"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-surface-subtle)]"
                   aria-label="Profile"
                 >
-                  <User className="h-4 w-4" />
+                  <User className="h-5 w-5" />
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-56 rounded-2xl border border-[#e6e0d8] bg-white p-4 text-xs text-[#3a3a3a]"
+                className="w-56 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-xs text-[color:var(--color-text-subtle)]"
                 align="start"
                 side="right"
               >
-                <div className="text-[11px] uppercase tracking-[0.18em] text-[#6b6b6b]">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
                   Profile
                 </div>
                 <div className="mt-2 text-sm font-semibold">
                   {sessionEmail ?? "Not signed in"}
                 </div>
-                <div className="mt-1 text-xs text-[#6b6b6b]">
+                <div className="mt-1 text-xs text-[color:var(--color-text-muted)]">
                   {sessionEmail ? "Signed in" : "Sign in to manage account"}
                 </div>
                 {onSignOut ? (
@@ -136,7 +133,7 @@ export function AppShell({
                     type="button"
                     onClick={onSignOut}
                     variant="outline"
-                    className="mt-4 w-full rounded-full border-[#1a1a1a] text-xs uppercase tracking-[0.18em] text-[#1a1a1a]"
+                    className="mt-4 w-full rounded-full border-[color:var(--color-ink)] text-xs uppercase tracking-[0.18em] text-[color:var(--color-ink)]"
                   >
                     Sign out
                   </Button>
@@ -156,7 +153,7 @@ export function AppShell({
   }
 
   return (
-    <div className="h-screen overflow-hidden text-[15px] text-[#1a1a1a]">
+    <div className="h-screen overflow-hidden text-[15px] text-[color:var(--color-text)]">
       <main className="mx-auto flex h-full w-full max-w-none flex-col">
         {content}
       </main>

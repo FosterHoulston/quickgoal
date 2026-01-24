@@ -3,17 +3,17 @@ import { AppShell } from "@/components/AppShell";
 export default function AboutPage() {
   return (
     <AppShell>
-      <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[#e6e0d8] bg-white">
+      <section className="flex min-h-0 flex-1 flex-col rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)]">
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3">
           <div>
-            <h1 className="text-2xl font-semibold text-[#1a1a1a]">About</h1>
-            <p className="mt-2 text-sm text-[#6b6b6b]">
+            <h1 className="text-2xl font-semibold text-[color:var(--color-text)]">About</h1>
+            <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
               A calm space to capture and finish what matters.
             </p>
           </div>
         </div>
         <div className="px-6 py-4">
-          <div className="flex flex-col gap-4 text-sm text-[#6b6b6b]">
+          <div className="flex flex-col gap-4 text-sm text-[color:var(--color-text-muted)]">
             <p>
               Quickgoal was built as a daily reminder that discipline compounds.
               By setting small, time‑boxed goals and marking them complete, you
@@ -29,10 +29,10 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-6">
-            <div className="text-lg font-semibold text-[#1a1a1a]">
+            <div className="text-lg font-semibold text-[color:var(--color-text)]">
               How to use
             </div>
-            <ul className="mt-3 space-y-2 text-sm text-[#6b6b6b]">
+            <ul className="mt-3 space-y-2 text-sm text-[color:var(--color-text-muted)]">
               <li>• Create a short, clear goal as soon as you decide to do it.</li>
               <li>• Optionally add an end date to keep the goal time‑boxed.</li>
               <li>• Mark the outcome when you finish — pass or fail.</li>
@@ -43,10 +43,10 @@ export default function AboutPage() {
           </div>
 
           <div className="mt-6">
-            <div className="text-lg font-semibold text-[#1a1a1a]">
+            <div className="text-lg font-semibold text-[color:var(--color-text)]">
               Why it works
             </div>
-            <ul className="mt-3 space-y-2 text-sm text-[#6b6b6b]">
+            <ul className="mt-3 space-y-2 text-sm text-[color:var(--color-text-muted)]">
               <li>• Fast entry with instant timestamping</li>
               <li>• End dates for time‑boxed goals</li>
               <li>• Outcome tracking with visual progress</li>
