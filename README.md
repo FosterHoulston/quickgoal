@@ -32,3 +32,12 @@ Quickgoal is a web app to capture goals with:
 - Run `supabase/schema.sql` to create tables.
 - Run `supabase/policies.sql` to enable RLS and policies.
 - Run `supabase/seed.sql` to seed categories.
+
+## Environment variables
+Create a `.env.local` in the app root with:
+```
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_ADSENSE_CLIENT=your-adsense-client-id
+NEXT_PUBLIC_ADSENSE_SLOT=your-adsense-slot-id
+```

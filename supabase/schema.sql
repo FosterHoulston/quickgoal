@@ -37,3 +37,10 @@ create table if not exists public.goal_categories (
   category_id uuid not null references public.categories(id) on delete cascade,
   primary key (goal_id, category_id)
 );
+
+create table if not exists public.user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  ads_enabled boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);

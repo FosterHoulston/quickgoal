@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,8 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: "mindset", name: "Mindset" },
   { id: "creative", name: "Creative" },
 ];
+
+const HOVER_CARD_DELAY = 800;
 
 const formatTimestamp = (value: Date | string) => {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -165,6 +168,7 @@ const buildDailyGrid = (goals: Goal[], year: number) => {
 
 export default function Home() {
   const { session, authReady } = useAuth();
+  const router = useRouter();
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -769,7 +773,7 @@ export default function Home() {
       } else {
         setHoverCard({ id: goalId, top: 0 });
       }
-    }, 800);
+    }, HOVER_CARD_DELAY);
   };
 
   const handleRowLeave = () => {
@@ -783,6 +787,11 @@ export default function Home() {
     hoverHideTimeoutRef.current = window.setTimeout(() => {
       setHoverCard(null);
     }, 150);
+  };
+
+  const handleTagNavigate = (tag: string) => {
+    const encoded = encodeURIComponent(tag);
+    router.push(`/tags?highlight=${encoded}`);
   };
 
   return (
@@ -893,7 +902,7 @@ export default function Home() {
                 <Button
                   type="button"
                   onClick={() => setNewGoalOpen(true)}
-                  className="flex items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
+                  className="flex cursor-pointer items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
                 >
                   Create goal
                   <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
@@ -953,7 +962,7 @@ export default function Home() {
                                 }
                               }}
                               aria-disabled={!isAuthed}
-                              className={`h-11 border-t border-[color:var(--color-surface-subtle)] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-ring-40)] ${
+                              className={`h-11 cursor-pointer border-t border-[color:var(--color-surface-subtle)] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-ring-40)] ${
                                 goal.outcome === "passed"
                                   ? "shadow-[inset_4px_0_0_0_var(--color-accent)] hover:bg-[color:var(--color-success-soft)]"
                                   : goal.outcome === "failed"
@@ -997,12 +1006,17 @@ export default function Home() {
                                 {goal.categories.length > 0 ? (
                                   <div className="flex items-center gap-1.5 truncate uppercase tracking-[0.16em]">
                                     {goal.categories.slice(0, 2).map((category, index) => (
-                                      <span
+                                      <button
                                         key={`${goal.id}-${category}-${index}`}
-                                        className="truncate"
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleTagNavigate(category);
+                                        }}
+                                        className="cursor-pointer truncate hover:text-[color:var(--color-text)]"
                                       >
                                         {category}
-                                      </span>
+                                      </button>
                                     ))}
                                     {goal.categories.length > 2 ? (
                                       <span className="shrink-0">
@@ -1072,13 +1086,22 @@ export default function Home() {
                                 {goal.categories.length > 0 ? (
                                   <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
                                     {goal.categories.map((category, index) => (
-                                      <Badge
+                                      <button
                                         key={`${goal.id}-${category}-${index}`}
-                                        variant="outline"
-                                        className="rounded-full border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-0.5 uppercase tracking-[0.16em] text-[color:var(--color-text-subtle)]"
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          handleTagNavigate(category);
+                                        }}
+                                        className="cursor-pointer"
                                       >
-                                        {category}
-                                      </Badge>
+                                        <Badge
+                                          variant="outline"
+                                          className="rounded-full border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-0.5 uppercase tracking-[0.16em] text-[color:var(--color-text-subtle)] transition hover:border-[color:var(--color-accent)]"
+                                        >
+                                          {category}
+                                        </Badge>
+                                      </button>
                                     ))}
                                   </div>
                                 ) : null}
@@ -1126,7 +1149,7 @@ export default function Home() {
                         value={String(selectedYear)}
                         onValueChange={(value) => setSelectedYear(Number(value))}
                       >
-                        <SelectTrigger className="h-8 w-[88px] justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
+                        <SelectTrigger className="h-8 w-[88px] cursor-pointer justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
                           <SelectValue placeholder="Year" />
                         </SelectTrigger>
                         <SelectContent>

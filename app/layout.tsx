@@ -3,6 +3,7 @@ import { Fraunces, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import { GoalDataProvider } from "@/components/GoalDataProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { UserSettingsProvider } from "@/components/UserSettingsProvider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -30,7 +31,9 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${fraunces.variable} antialiased`}>
         <ThemeProvider>
           <AuthProvider>
-            <GoalDataProvider>{children}</GoalDataProvider>
+            <UserSettingsProvider>
+              <GoalDataProvider>{children}</GoalDataProvider>
+            </UserSettingsProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

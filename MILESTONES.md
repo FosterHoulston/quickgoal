@@ -1,39 +1,39 @@
 # Milestones
 
 ## 1. Project setup
-- [ ] Initialize Next.js app (TypeScript).
-- [ ] Add Tailwind CSS.
-- [ ] Add shadcn/ui and a base theme.
-- [ ] Add a simple layout shell.
+- [x] Initialize Next.js app (TypeScript).
+- [x] Add Tailwind CSS.
+- [x] Add shadcn/ui and a base theme.
+- [x] Add a simple layout shell.
 
 ## 2. Supabase setup
 - [ ] Create Supabase project.
-- [ ] Define tables: `goals`, `categories`, `goal_categories`.
-- [ ] Add Row Level Security policies.
-- [ ] Seed a small set of categories.
+- [x] Define tables: `goals`, `categories`, `goal_categories`.
+- [x] Add Row Level Security policies.
+- [x] Seed a small set of categories.
 
 ## 3. Auth
 - [ ] Enable Google provider in Supabase.
 - [ ] Enable Email provider (magic link or password).
-- [ ] Add sign-in UI in the app.
-- [ ] Verify sign-in and sign-out flow.
+- [x] Add sign-in UI in the app.
+- [x] Verify sign-in and sign-out flow.
 
 ## 4. Goal creation
-- [ ] Build goal input with timestamp-on-first-keystroke behavior.
-- [ ] Add short/long term toggle.
-- [ ] Add end-datetime toggle and input.
-- [ ] Add category multi-select.
-- [ ] Save goals to Supabase.
+- [x] Build goal input with timestamp-on-first-keystroke behavior.
+- [x] Add short/long term toggle.
+- [x] Add end-datetime toggle and input.
+- [x] Add category multi-select.
+- [x] Save goals to Supabase.
 
 ## 5. Goal list
-- [ ] List saved goals by most recent.
+- [x] List saved goals by most recent.
 - [ ] Show term, timestamp, end-datetime, categories.
-- [ ] Add empty state for no goals.
+- [x] Add empty state for no goals.
 
 ## 6. Polish and validation
-- [ ] Add client-side validation for required fields.
-- [ ] Improve spacing, typography, and mobile layout.
-- [ ] Add loading and error states.
+- [x] Add client-side validation for required fields.
+- [x] Improve spacing, typography, and mobile layout.
+- [x] Add loading and error states.
 
 ## 7. Deployment
 - [ ] Push to GitHub.

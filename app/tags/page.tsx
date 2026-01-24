@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/components/AuthProvider";
@@ -27,6 +27,15 @@ const DEFAULT_TAGS = [
   { name: "Creative", description: null },
 ];
 
+const TAG_HIGHLIGHT_DURATION = 800;
+
+const normalizeTag = (value: string) => value.trim().toLowerCase();
+
+const toTagId = (value: string) =>
+  normalizeTag(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
 export default function TagsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -46,6 +55,8 @@ export default function TagsPage() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [highlightedTag, setHighlightedTag] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
   const [toasts, setToasts] = useState<
     { id: string; message: string; tone?: "default" | "success" | "error" }[]
   >([]);
@@ -63,12 +74,44 @@ export default function TagsPage() {
     }, 4000);
   };
 
+  const createParam = searchParams?.get("create");
+  const highlightParam = searchParams?.get("highlight");
+
   useEffect(() => {
-    if (searchParams?.get("create") === "1") {
+    if (createParam === "1") {
       setCreateOpen(true);
       router.replace("/tags", { scroll: false });
     }
-  }, [router, searchParams]);
+  }, [createParam, router]);
+
+  useEffect(() => {
+    if (!highlightParam || categories.length === 0) return;
+    const normalized = normalizeTag(highlightParam);
+    const match = categories.find(
+      (tag) => normalizeTag(tag.name) === normalized,
+    );
+    if (!match) return;
+    const element = document.getElementById(`tag-${toTagId(match.name)}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setHighlightedTag(normalized);
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedTag(null);
+    }, TAG_HIGHLIGHT_DURATION);
+    router.replace("/tags", { scroll: false });
+  }, [categories, highlightParam, router]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!supabase) return;
@@ -265,7 +308,7 @@ export default function TagsPage() {
           <Button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
+            className="flex cursor-pointer items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
           >
             Create tag
             <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
@@ -291,21 +334,31 @@ export default function TagsPage() {
               ) : (
                 <div className="min-h-0 flex-1 overflow-y-auto pr-2">
                   <div className="columns-1 gap-3 md:columns-2">
-                  {categories.map((tag) => (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => openEdit(tag)}
-                    className="mb-3 flex w-full break-inside-avoid flex-col gap-3 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 text-left transition hover:border-[color:var(--color-accent)]"
-                    >
-                      <div className="text-lg font-semibold text-[color:var(--color-text)]">
-                        {tag.name}
-                      </div>
-                      <p className="text-sm text-[color:var(--color-text-muted)]">
-                        {tag.description || "No description yet. Click to add one."}
-                      </p>
-                    </button>
-                  ))}
+                  {categories.map((tag) => {
+                    const tagKey = normalizeTag(tag.name);
+                    const isHighlighted = tagKey === highlightedTag;
+                    return (
+                      <button
+                        key={tag.id}
+                        id={`tag-${toTagId(tag.name)}`}
+                        data-tag-name={tagKey}
+                        type="button"
+                        onClick={() => openEdit(tag)}
+                        className={`mb-3 flex w-full cursor-pointer break-inside-avoid flex-col gap-3 rounded-2xl border bg-[color:var(--color-surface)] p-4 text-left transition hover:border-[color:var(--color-accent)] ${
+                          isHighlighted
+                            ? "border-[color:var(--color-accent)]"
+                            : "border-[color:var(--color-border)]"
+                        }`}
+                      >
+                        <div className="text-lg font-semibold text-[color:var(--color-text)]">
+                          {tag.name}
+                        </div>
+                        <p className="text-sm text-[color:var(--color-text-muted)]">
+                          {tag.description || "No description yet. Click to add one."}
+                        </p>
+                      </button>
+                    );
+                  })}
                   </div>
                 </div>
               )}

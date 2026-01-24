@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { AdSenseSlot } from "@/components/AdSenseSlot";
+import { useUserSettings } from "@/components/UserSettingsProvider";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
+import { GitBranch, Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
 import QuickgoalIcon from "@/app/quickgoal-icon";
 
 type AppShellProps = {
@@ -22,6 +24,8 @@ const NAV_ITEMS = [
   { label: "About", icon: Info, href: "/about" },
 ];
 
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "v0.1.0";
+
 export function AppShell({
   children,
   sessionEmail,
@@ -30,6 +34,9 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { adsEnabled, settingsLoaded } = useUserSettings();
+  const hasAdSense =
+    !!process.env.NEXT_PUBLIC_ADSENSE_CLIENT && !!process.env.NEXT_PUBLIC_ADSENSE_SLOT;
 
   useEffect(() => {
     if (embedded) return;
@@ -65,6 +72,10 @@ export function AppShell({
             href="/"
             className="flex h-11 w-11 items-center justify-center rounded-2xl"
             aria-label="Dashboard"
+            onClick={(event) => {
+              event.preventDefault();
+              window.location.assign("/");
+            }}
           >
             <QuickgoalIcon size={44} />
           </Link>
@@ -103,12 +114,20 @@ export function AppShell({
               );
             })}
           </div>
-          <div className="mt-auto">
+          <div className="mt-auto flex flex-col items-center gap-3">
+            <Link
+              href="/about"
+              className="flex flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
+              aria-label="App version"
+            >
+              <GitBranch className="h-4 w-4" />
+              <span>{APP_VERSION}</span>
+            </Link>
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-surface-subtle)]"
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-surface-subtle)]"
                   aria-label="Profile"
                 >
                   <User className="h-5 w-5" />
@@ -133,7 +152,7 @@ export function AppShell({
                     type="button"
                     onClick={onSignOut}
                     variant="outline"
-                    className="mt-4 w-full rounded-full border-[color:var(--color-ink)] text-xs uppercase tracking-[0.18em] text-[color:var(--color-ink)]"
+                    className="mt-4 w-full cursor-pointer rounded-full border-[color:var(--color-ink)] text-xs uppercase tracking-[0.18em] text-[color:var(--color-ink)]"
                   >
                     Sign out
                   </Button>
@@ -143,7 +162,20 @@ export function AppShell({
           </div>
         </aside>
 
-        <div className="flex min-h-0 flex-col gap-4 px-6 py-5">{children}</div>
+        <div className="flex min-h-0 flex-col gap-4 px-6 py-5">
+          {children}
+          {settingsLoaded && adsEnabled && hasAdSense ? (
+            <div className="mt-auto rounded-2xl border border-[#e6e0d8] bg-white/70 p-4">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                Sponsored
+              </div>
+              <AdSenseSlot className="mt-3" />
+              <p className="mt-3 text-[10px] uppercase tracking-[0.2em] text-[#6b6b6b]">
+                Ads may be hidden by blockers.
+              </p>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

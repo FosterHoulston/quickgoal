@@ -13,6 +13,7 @@ Run these in the Supabase SQL editor in order:
 5. `supabase/migrations/20250120_remove_duration.sql` (if upgrading an existing DB)
 6. `supabase/migrations/20250120_add_tags_fields.sql` (if upgrading an existing DB)
 7. `supabase/migrations/20250120_fix_categories_unique.sql` (if upgrading an existing DB)
+8. `supabase/migrations/20260124_add_user_settings.sql` (if upgrading an existing DB)
 
 ## 3. Configure Auth providers
 - Enable Google provider.
