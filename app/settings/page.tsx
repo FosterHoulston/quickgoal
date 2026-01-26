@@ -59,7 +59,7 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-          <div className="mt-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+          <div className="mt-4 hidden rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--color-text)]">

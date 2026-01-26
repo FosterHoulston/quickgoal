@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { GitBranch, Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
+import { GitBranch, Github, Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
 import QuickgoalIcon from "@/app/quickgoal-icon";
 
 type AppShellProps = {
@@ -26,16 +26,25 @@ const NAV_ITEMS = [
   { label: "About", icon: Info, href: "/about" },
 ];
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "v0.1.0";
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0.0";
 const APP_REPO_URL = process.env.NEXT_PUBLIC_APP_REPO_URL ?? "";
 const RELEASE_NOTES = [
   {
-    version: "v0.1.0",
-    date: "Jan 24, 2026",
+    version: "v1.0.0",
+    date: "Jan 26, 2026",
     sections: [
       {
         title: "Features",
-        items: ["Initial release of Quickgoal core flows."],
+        items: [
+          "Google sign-in with Supabase authentication.",
+          "Instant goal timestamps on first keystroke.",
+          "Optional end date toggle with datetime input.",
+          "Tag (category) multi-select and tags management.",
+          "Save goals to Supabase with recent-first sorting.",
+          "Editable goals with delete support.",
+          "Pass/fail outcomes with heatmap progress view.",
+          "Keyboard shortcuts for creating goals and tags.",
+        ],
       },
     ],
   },
@@ -214,56 +223,67 @@ export function AppShell({
       <Dialog open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen}>
         <DialogContent
           showCloseButton={false}
-          className="w-full max-w-3xl rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 shadow-[var(--shadow-modal)]"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setReleaseNotesOpen(false);
+            }
+          }}
+          className="!fixed !inset-0 !top-0 !left-0 !translate-x-0 !translate-y-0 !p-0 !w-screen !max-w-none !h-screen !rounded-none !border-0 !bg-transparent !shadow-none flex items-center justify-center"
         >
           <DialogTitle asChild>
             <VisuallyHidden>Release notes</VisuallyHidden>
           </DialogTitle>
-          <div className="space-y-6 text-sm text-[color:var(--color-text-muted)]">
-            {RELEASE_NOTES.map((release) => (
-              <section
-                key={release.version}
-                className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-2xl font-semibold text-[color:var(--color-text)]">
-                    {release.version}
-                  </div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
-                    {release.date}
-                  </div>
-                </div>
-                <div className="mt-3 space-y-4">
-                  {release.sections.map((section) => (
-                    <div key={`${release.version}-${section.title}`}>
-                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
-                        {section.title}
-                      </div>
-                      <ul className="mt-2 space-y-1 text-sm text-[color:var(--color-text-subtle)]">
-                        {section.items.map((item) => (
-                          <li key={`${release.version}-${item}`} className="flex gap-2">
-                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--color-accent)]" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
+          <div className="relative w-full max-w-3xl max-h-[85vh] overflow-y-auto rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]">
+            <div className="flex items-center justify-start">
+              {APP_REPO_URL ? (
+                <a
+                  href={APP_REPO_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="GitHub repository"
+                  className="inline-flex items-center gap-0.5 rounded-full text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
+                >
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full">
+                    <Github className="h-4 w-4" />
+                  </span>
+                  <span className="text-[11px] uppercase tracking-[0.2em]">GitHub</span>
+                </a>
+              ) : null}
+            </div>
+            <div className="mt-3 space-y-6 text-sm text-[color:var(--color-text-muted)]">
+              {RELEASE_NOTES.map((release) => (
+                <section
+                  key={release.version}
+                  className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-2xl font-semibold text-[color:var(--color-text)]">
+                      {release.version}
                     </div>
-                  ))}
-                </div>
-                {APP_REPO_URL ? (
-                  <div className="mt-4 border-t border-[color:var(--color-border)] pt-3">
-                    <a
-                      href={APP_REPO_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
-                    >
-                      View repo
-                    </a>
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
+                      {release.date}
+                    </div>
                   </div>
-                ) : null}
-              </section>
-            ))}
+                  <div className="mt-3 space-y-4">
+                    {release.sections.map((section) => (
+                      <div key={`${release.version}-${section.title}`}>
+                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
+                          {section.title}
+                        </div>
+                        <ul className="mt-2 space-y-1 text-sm text-[color:var(--color-text-subtle)]">
+                          {section.items.map((item) => (
+                            <li key={`${release.version}-${item}`} className="flex gap-2">
+                              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--color-accent)]" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

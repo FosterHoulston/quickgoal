@@ -1396,8 +1396,8 @@ export default function Home() {
                     variant="outline"
                     className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
                       editOutcome === "passed"
-                        ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
-                        : "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                        ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                        : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-accent)]"
                     }`}
                   >
                     Pass
@@ -1409,8 +1409,8 @@ export default function Home() {
                     variant="outline"
                     className={`rounded-full border px-4 py-2 text-sm font-medium uppercase tracking-[0.14em] transition ${
                       editOutcome === "failed"
-                        ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-strong)] text-[color:var(--color-button-text)] shadow-sm"
-                        : "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
+                        ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
+                        : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-danger-strong)]"
                     }`}
                   >
                     Fail
@@ -1461,7 +1461,7 @@ export default function Home() {
                         variant="outline"
                         className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                           selected
-                            ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
+                            ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
                             : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-accent)]"
                         }`}
                       >
@@ -1601,7 +1601,7 @@ export default function Home() {
                       variant="outline"
                       className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                         selected
-                          ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent)] text-[color:var(--color-button-text)] shadow-sm"
+                          ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
                           : "border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)] hover:border-[color:var(--color-accent)]"
                       } disabled:cursor-not-allowed disabled:opacity-60`}
                     >
