@@ -957,7 +957,7 @@ export default function Home() {
                           : "Sign in to view your goals."}
                       </div>
                     ) : (
-                    <div className="relative flex min-h-0 flex-1 flex-col pb-3">
+                    <div className="relative flex min-h-0 flex-1 flex-col">
                       <div
                         ref={tableContainerRef}
                         className="min-h-0 flex-1 overflow-y-auto"
@@ -1171,7 +1171,9 @@ export default function Home() {
                 </div>
 
                 <div
-                  className={`px-6 ${heatmapOpen ? "border-t border-[color:var(--color-border)] py-3" : "pt-0 pb-3"}`}
+                  className={`flex-shrink-0 px-6 ${
+                    heatmapOpen ? "border-t border-[color:var(--color-border)] py-3" : "pt-0 pb-3"
+                  }`}
                 >
                   {heatmapOpen ? (
                     <>
@@ -1322,7 +1324,7 @@ export default function Home() {
                       </div>
                     </>
                   ) : null}
-                  <div className="flex items-center justify-center border-t border-[color:var(--color-border)] pt-3">
+                  <div className="flex items-center justify-center border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] pt-3">
                     <button
                       type="button"
                       onClick={() => setHeatmapOpen((open) => !open)}
