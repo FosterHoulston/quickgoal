@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/components/AuthProvider";
@@ -27,7 +27,15 @@ const DEFAULT_TAGS = [
   { name: "Creative", description: null },
 ];
 
-const TAG_HIGHLIGHT_DURATION = 800;
+const TAG_HIGHLIGHT_DURATION = 2400;
+let toastIdCounter = 0;
+const nextToastId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  toastIdCounter += 1;
+  return `toast-${toastIdCounter}`;
+};
 
 const normalizeTag = (value: string) => value.trim().toLowerCase();
 
@@ -36,7 +44,7 @@ const toTagId = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-export default function TagsPage() {
+function TagsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session } = useAuth();
@@ -55,8 +63,6 @@ export default function TagsPage() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [highlightedTag, setHighlightedTag] = useState<string | null>(null);
-  const highlightTimeoutRef = useRef<number | null>(null);
   const [toasts, setToasts] = useState<
     { id: string; message: string; tone?: "default" | "success" | "error" }[]
   >([]);
@@ -65,9 +71,7 @@ export default function TagsPage() {
     message: string,
     tone: "default" | "success" | "error" = "default",
   ) => {
-    const id = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
+    const id = nextToastId();
     setToasts((current) => [...current, { id, message, tone }]);
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -76,47 +80,42 @@ export default function TagsPage() {
 
   const createParam = searchParams?.get("create");
   const highlightParam = searchParams?.get("highlight");
+  const createRequested = createParam === "1";
 
-  useEffect(() => {
-    if (createParam === "1") {
-      setCreateOpen(true);
-      router.replace("/tags", { scroll: false });
-    }
-  }, [createParam, router]);
-
-  useEffect(() => {
-    if (!highlightParam || categories.length === 0) return;
+  const highlightTagKey = useMemo(() => {
+    if (!highlightParam || categories.length === 0) return null;
     const normalized = normalizeTag(highlightParam);
     const match = categories.find(
       (tag) => normalizeTag(tag.name) === normalized,
     );
-    if (!match) return;
-    const element = document.getElementById(`tag-${toTagId(match.name)}`);
+    return match ? normalizeTag(match.name) : null;
+  }, [categories, highlightParam]);
+
+  const highlightTagId = useMemo(() => {
+    if (!highlightTagKey || categories.length === 0) return null;
+    const match = categories.find(
+      (tag) => normalizeTag(tag.name) === highlightTagKey,
+    );
+    return match ? `tag-${toTagId(match.name)}` : null;
+  }, [categories, highlightTagKey]);
+
+  useEffect(() => {
+    if (!highlightTagId) return;
+    const element = document.getElementById(highlightTagId);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    setHighlightedTag(normalized);
-    if (highlightTimeoutRef.current) {
-      window.clearTimeout(highlightTimeoutRef.current);
-    }
-    highlightTimeoutRef.current = window.setTimeout(() => {
-      setHighlightedTag(null);
+    const timeout = window.setTimeout(() => {
+      router.replace("/tags", { scroll: false });
     }, TAG_HIGHLIGHT_DURATION);
-    router.replace("/tags", { scroll: false });
-  }, [categories, highlightParam, router]);
-
-  useEffect(() => {
-    return () => {
-      if (highlightTimeoutRef.current) {
-        window.clearTimeout(highlightTimeoutRef.current);
-      }
-    };
-  }, []);
+    return () => window.clearTimeout(timeout);
+  }, [highlightTagId, router]);
 
   useEffect(() => {
     if (!supabase) return;
 
     const loadTags = async () => {
+      if (!supabase) return;
       setLoading(!categoriesLoaded);
       setError(null);
       const userId = session?.user.id;
@@ -308,11 +307,11 @@ export default function TagsPage() {
           <Button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="flex cursor-pointer items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
+            className="flex cursor-pointer items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-subtle)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-muted)]"
           >
             Create tag
             <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
-              t
+              T
             </span>
           </Button>
         </div>
@@ -336,7 +335,7 @@ export default function TagsPage() {
                   <div className="columns-1 gap-3 md:columns-2">
                   {categories.map((tag) => {
                     const tagKey = normalizeTag(tag.name);
-                    const isHighlighted = tagKey === highlightedTag;
+                    const isHighlighted = tagKey === highlightTagKey;
                     return (
                       <button
                         key={tag.id}
@@ -345,10 +344,13 @@ export default function TagsPage() {
                         type="button"
                         onClick={() => openEdit(tag)}
                         className={`mb-3 flex w-full cursor-pointer break-inside-avoid flex-col gap-3 rounded-2xl border bg-[color:var(--color-surface)] p-4 text-left transition hover:border-[color:var(--color-accent)] ${
-                          isHighlighted
-                            ? "border-[color:var(--color-accent)]"
-                            : "border-[color:var(--color-border)]"
+                          isHighlighted ? "tag-highlight" : ""
                         }`}
+                        style={
+                          isHighlighted
+                            ? { ["--tag-highlight-duration" as string]: `${TAG_HIGHLIGHT_DURATION}ms` }
+                            : undefined
+                        }
                       >
                         <div className="text-lg font-semibold text-[color:var(--color-text)]">
                           {tag.name}
@@ -367,7 +369,15 @@ export default function TagsPage() {
         </div>
       </section>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen || createRequested}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (open && createRequested) {
+            router.replace("/tags", { scroll: false });
+          }
+        }}
+      >
         <DialogContent
           className="rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6"
           onKeyDown={(event) => {
@@ -399,7 +409,7 @@ export default function TagsPage() {
               <Button
                 type="button"
                 onClick={handleCreate}
-                className="rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
+                className="rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-subtle)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-muted)]"
               >
                 Create
               </Button>
@@ -485,5 +495,13 @@ export default function TagsPage() {
         ))}
       </div>
     </AppShell>
+  );
+}
+
+export default function TagsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <TagsPageContent />
+    </Suspense>
   );
 }

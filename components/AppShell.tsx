@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AdSenseSlot } from "@/components/AdSenseSlot";
 import { useUserSettings } from "@/components/UserSettingsProvider";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GitBranch, Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
 import QuickgoalIcon from "@/app/quickgoal-icon";
@@ -25,6 +27,19 @@ const NAV_ITEMS = [
 ];
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "v0.1.0";
+const APP_REPO_URL = process.env.NEXT_PUBLIC_APP_REPO_URL ?? "";
+const RELEASE_NOTES = [
+  {
+    version: "v0.1.0",
+    date: "Jan 24, 2026",
+    sections: [
+      {
+        title: "Features",
+        items: ["Initial release of Quickgoal core flows."],
+      },
+    ],
+  },
+];
 
 export function AppShell({
   children,
@@ -37,6 +52,7 @@ export function AppShell({
   const { adsEnabled, settingsLoaded } = useUserSettings();
   const hasAdSense =
     !!process.env.NEXT_PUBLIC_ADSENSE_CLIENT && !!process.env.NEXT_PUBLIC_ADSENSE_SLOT;
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
 
   useEffect(() => {
     if (embedded) return;
@@ -96,6 +112,7 @@ export function AppShell({
                     href={item.href}
                     className={className}
                     aria-label={item.label}
+                    title={item.label}
                   >
                     <Icon className="h-5 w-5" />
                   </Link>
@@ -108,6 +125,7 @@ export function AppShell({
                   type="button"
                   className={className}
                   aria-label={item.label}
+                  title={item.label}
                 >
                   <Icon className="h-5 w-5" />
                 </button>
@@ -115,20 +133,22 @@ export function AppShell({
             })}
           </div>
           <div className="mt-auto flex flex-col items-center gap-3">
-            <Link
-              href="/about"
-              className="flex flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
-              aria-label="App version"
+            <button
+              type="button"
+              onClick={() => setReleaseNotesOpen(true)}
+              className="flex cursor-pointer flex-col items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
+              aria-label="Release notes"
             >
               <GitBranch className="h-4 w-4" />
               <span>{APP_VERSION}</span>
-            </Link>
+            </button>
             <Popover>
               <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-surface-subtle)]"
                   aria-label="Profile"
+                  title="Profile"
                 >
                   <User className="h-5 w-5" />
                 </button>
@@ -185,10 +205,68 @@ export function AppShell({
   }
 
   return (
-    <div className="h-screen overflow-hidden text-[15px] text-[color:var(--color-text)]">
-      <main className="mx-auto flex h-full w-full max-w-none flex-col">
-        {content}
-      </main>
-    </div>
+    <>
+      <div className="h-screen overflow-hidden text-[15px] text-[color:var(--color-text)]">
+        <main className="mx-auto flex h-full w-full max-w-none flex-col">
+          {content}
+        </main>
+      </div>
+      <Dialog open={releaseNotesOpen} onOpenChange={setReleaseNotesOpen}>
+        <DialogContent
+          showCloseButton={false}
+          className="w-full max-w-3xl rounded-3xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 shadow-[var(--shadow-modal)]"
+        >
+          <DialogTitle asChild>
+            <VisuallyHidden>Release notes</VisuallyHidden>
+          </DialogTitle>
+          <div className="space-y-6 text-sm text-[color:var(--color-text-muted)]">
+            {RELEASE_NOTES.map((release) => (
+              <section
+                key={release.version}
+                className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] p-4"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-2xl font-semibold text-[color:var(--color-text)]">
+                    {release.version}
+                  </div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
+                    {release.date}
+                  </div>
+                </div>
+                <div className="mt-3 space-y-4">
+                  {release.sections.map((section) => (
+                    <div key={`${release.version}-${section.title}`}>
+                      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
+                        {section.title}
+                      </div>
+                      <ul className="mt-2 space-y-1 text-sm text-[color:var(--color-text-subtle)]">
+                        {section.items.map((item) => (
+                          <li key={`${release.version}-${item}`} className="flex gap-2">
+                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--color-accent)]" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                {APP_REPO_URL ? (
+                  <div className="mt-4 border-t border-[color:var(--color-border)] pt-3">
+                    <a
+                      href={APP_REPO_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-text-muted)] transition hover:text-[color:var(--color-text)]"
+                    >
+                      View repo
+                    </a>
+                  </div>
+                ) : null}
+              </section>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

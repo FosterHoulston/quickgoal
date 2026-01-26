@@ -7,13 +7,13 @@
 - [x] Add a simple layout shell.
 
 ## 2. Supabase setup
-- [ ] Create Supabase project.
+- [x] Create Supabase project.
 - [x] Define tables: `goals`, `categories`, `goal_categories`.
 - [x] Add Row Level Security policies.
 - [x] Seed a small set of categories.
 
 ## 3. Auth
-- [ ] Enable Google provider in Supabase.
+- [x] Enable Google provider in Supabase.
 - [ ] Enable Email provider (magic link or password).
 - [x] Add sign-in UI in the app.
 - [x] Verify sign-in and sign-out flow.
@@ -27,7 +27,7 @@
 
 ## 5. Goal list
 - [x] List saved goals by most recent.
-- [ ] Show term, timestamp, end-datetime, categories.
+- [x] timestamp, end-datetime, tags.
 - [x] Add empty state for no goals.
 
 ## 6. Polish and validation

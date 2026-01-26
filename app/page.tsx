@@ -24,6 +24,7 @@ import { AppShell } from "@/components/AppShell";
 import { useGoalData } from "@/components/GoalDataProvider";
 import { supabase } from "@/lib/supabaseClient";
 import type { Category, Goal } from "@/lib/types";
+import { Activity } from "lucide-react";
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "health", name: "Health" },
@@ -36,6 +37,15 @@ const DEFAULT_CATEGORIES: Category[] = [
 ];
 
 const HOVER_CARD_DELAY = 800;
+const getNow = () => Date.now();
+let toastIdCounter = 0;
+const nextToastId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  toastIdCounter += 1;
+  return `toast-${toastIdCounter}`;
+};
 
 const formatTimestamp = (value: Date | string) => {
   const date = typeof value === "string" ? new Date(value) : value;
@@ -192,6 +202,7 @@ export default function Home() {
   const [draftStartedAt, setDraftStartedAt] = useState<Date | null>(null);
   const [hasEndAt, setHasEndAt] = useState(false);
   const [endAt, setEndAt] = useState("");
+  const [heatmapOpen, setHeatmapOpen] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [goalsLoading, setGoalsLoading] = useState(!goalsLoaded);
   const [goalsError, setGoalsError] = useState<string | null>(null);
@@ -216,7 +227,7 @@ export default function Home() {
   const [editSelectedCategories, setEditSelectedCategories] = useState<string[]>([]);
   const [editSaving, setEditSaving] = useState(false);
   const [editDeleting, setEditDeleting] = useState(false);
-  const [clockTick, setClockTick] = useState(Date.now());
+  const [clockTick, setClockTick] = useState(getNow);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   const isAuthed = !!session;
@@ -226,9 +237,7 @@ export default function Home() {
     message: string,
     tone: "default" | "success" | "error" = "default",
   ) => {
-    const id = typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()}`;
+    const id = nextToastId();
     setToasts((current) => [...current, { id, message, tone }]);
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -258,6 +267,7 @@ export default function Home() {
     }
 
     const loadCategories = async () => {
+      if (!supabase || !session) return;
       setCategoriesLoaded(false);
       const { data, error } = await supabase
         .from("categories")
@@ -333,12 +343,13 @@ export default function Home() {
     setCategoriesUserId,
   ]);
 
+  const goalsAvailable = !!supabase && !!session;
+
   useEffect(() => {
     if (!supabase) {
       setGoals([]);
       setGoalsUserId(null);
       setGoalsLoaded(true);
-      setGoalsLoading(false);
       return;
     }
 
@@ -347,16 +358,15 @@ export default function Home() {
       setGoals([]);
       setGoalsUserId(null);
       setGoalsLoaded(true);
-      setGoalsLoading(false);
       return;
     }
 
     if (goalsLoaded && goalsUserId === session.user.id) {
-      setGoalsLoading(false);
       return;
     }
 
     const loadGoals = async () => {
+      if (!supabase || !session) return;
       setGoalsLoading(true);
       setGoalsLoaded(false);
       setGoalsError(null);
@@ -378,10 +388,23 @@ export default function Home() {
         outcome: goal.outcome ?? undefined,
         createdAt: goal.created_at,
         endAt: goal.end_at ?? undefined,
-        categoryIds: goal.goal_categories?.map((item) => item.category_id).filter(Boolean) ?? [],
-        categories:
-          goal.goal_categories?.map((item) => item.categories?.name).filter(Boolean) ??
-          [],
+        categoryIds: (goal.goal_categories ?? [])
+          .map((item) => item.category_id)
+          .filter((id): id is string => typeof id === "string"),
+        categories: (goal.goal_categories ?? [])
+          .map((item) => {
+            const categories = item.categories as
+              | { name?: string }
+              | { name?: string }[]
+              | null
+              | undefined;
+            if (!categories) return null;
+            if (Array.isArray(categories)) {
+              return categories[0]?.name ?? null;
+            }
+            return categories.name ?? null;
+          })
+          .filter((name): name is string => typeof name === "string"),
       }));
       setGoals(mapped);
       setGoalsLoading(false);
@@ -519,6 +542,7 @@ export default function Home() {
   };
 
   const orderedGoals = useMemo(() => goals, [goals]);
+  const resolvedGoalsLoading = goalsAvailable ? goalsLoading : false;
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     orderedGoals.forEach((goal) => {
@@ -535,6 +559,15 @@ export default function Home() {
     () => buildDailyGrid(orderedGoals, selectedYear),
     [orderedGoals, selectedYear],
   );
+
+  useEffect(() => {
+    if (!heatmapOpen) return;
+    const container = tableContainerRef.current;
+    if (!container) return;
+    window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }, [heatmapOpen, orderedGoals.length]);
 
   const handleOutcome = async (goalId: string, nextOutcome: "passed" | "failed") => {
     setGoalsError(null);
@@ -768,7 +801,7 @@ export default function Home() {
       if (container) {
         const rowRect = target.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
-        const top = rowRect.top - containerRect.top + container.scrollTop;
+        const top = rowRect.top - containerRect.top;
         setHoverCard({ id: goalId, top });
       } else {
         setHoverCard({ id: goalId, top: 0 });
@@ -902,7 +935,7 @@ export default function Home() {
                 <Button
                   type="button"
                   onClick={() => setNewGoalOpen(true)}
-                  className="flex cursor-pointer items-center gap-2 rounded-full bg-[color:var(--color-button)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)]"
+                  className="flex cursor-pointer items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-[color:var(--color-surface-subtle)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)] transition hover:border-[color:var(--color-accent)] hover:bg-[color:var(--color-surface-muted)]"
                 >
                   Create goal
                   <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-sm border border-[color:var(--color-border)] bg-[color:var(--color-surface)] font-mono text-[11px] leading-none text-[color:var(--color-text)] shadow-sm normal-case tracking-normal">
@@ -913,7 +946,7 @@ export default function Home() {
 
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="flex min-h-0 flex-1 flex-col">
-                    {goalsLoading ? (
+                    {resolvedGoalsLoading ? (
                       <div className="px-6 py-4 text-sm text-[color:var(--color-text-muted)]">
                         Loading goals...
                       </div>
@@ -924,7 +957,7 @@ export default function Home() {
                           : "Sign in to view your goals."}
                       </div>
                     ) : (
-                    <div className="relative flex min-h-0 flex-1 flex-col">
+                    <div className="relative flex min-h-0 flex-1 flex-col pb-3">
                       <div
                         ref={tableContainerRef}
                         className="min-h-0 flex-1 overflow-y-auto"
@@ -1006,17 +1039,12 @@ export default function Home() {
                                 {goal.categories.length > 0 ? (
                                   <div className="flex items-center gap-1.5 truncate uppercase tracking-[0.16em]">
                                     {goal.categories.slice(0, 2).map((category, index) => (
-                                      <button
+                                      <span
                                         key={`${goal.id}-${category}-${index}`}
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleTagNavigate(category);
-                                        }}
-                                        className="cursor-pointer truncate hover:text-[color:var(--color-text)]"
+                                        className="truncate"
                                       >
                                         {category}
-                                      </button>
+                                      </span>
                                     ))}
                                     {goal.categories.length > 2 ? (
                                       <span className="shrink-0">
@@ -1142,151 +1170,172 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="border-t border-[color:var(--color-border)] px-6 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Select
-                        value={String(selectedYear)}
-                        onValueChange={(value) => setSelectedYear(Number(value))}
-                      >
-                        <SelectTrigger className="h-8 w-[88px] cursor-pointer justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
-                          <SelectValue placeholder="Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableYears.map((year) => (
-                            <SelectItem key={year} value={String(year)}>
-                              {year}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    {dailyGrid.weeks.length === 0 ? (
-                      <div className="border border-dashed border-[color:var(--color-border)] p-6 text-sm text-[color:var(--color-text-muted)]">
-                        No completed goals yet. Mark a goal as passed or failed to see
-                        progress.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-[auto_1fr] gap-3">
-                        <div
-                          className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[color:var(--color-text-muted)]"
-                          style={{ gridTemplateRows: "repeat(7, 12px)" }}
-                        >
-                          {["Mon", "Wed", "Fri"].map((day, index) => (
-                            <span
-                              key={day}
-                              className="flex h-4.5 items-end pb-[0px] leading-none"
-                              style={{ gridRowStart: 2 + index * 2 }}
-                            >
-                              {day}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="w-fit max-w-full">
-                          <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[color:var(--color-text-muted)]">
-                            {dailyGrid.monthLabels.map((label) => (
-                              <span
-                                key={`${label.index}-${label.label}`}
-                                style={{ gridColumnStart: label.index + 1 }}
-                              >
-                                {label.label}
-                              </span>
-                            ))}
-                          </div>
-                          <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
-                            {dailyGrid.weeks.map((week, weekIndex) => (
-                              <div key={`week-${weekIndex}`} className="grid gap-[6px]">
-                                {week.map((cell, dayIndex) => {
-                                  if (!cell) {
-                                    return (
-                                      <span
-                                        key={`empty-${weekIndex}-${dayIndex}`}
-                                        className="h-3 w-3 rounded-[4px]"
-                                      />
-                                    );
-                                  }
-                                  const total = cell.passCount + cell.failCount;
-                                  const passRatio = total > 0 ? cell.passCount / total : 0;
-                                  const intensity =
-                                    total === 0
-                                      ? 0
-                                      : Math.min(
-                                          1,
-                                          0.35 +
-                                            total / Math.max(1, dailyGrid.maxTotal),
-                                        );
-                                  const green = `rgb(var(--color-success-rgb) / ${intensity})`;
-                                  const red = `rgb(var(--color-danger-rgb) / ${intensity})`;
-                                  const background =
-                                      total === 0
-                                        ? "var(--color-surface-subtle)"
-                                        : `linear-gradient(90deg, ${green} ${Math.round(
-                                            passRatio * 100,
-                                          )}%, ${red} ${Math.round(
-                                            passRatio * 100,
-                                          )}%)`;
-                                  return (
-                                    <span
-                                      key={cell.key}
-                                      className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                      style={{ background }}
-                                      title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[color:var(--color-text-muted)]">
-                            <div className="flex items-center gap-2">
-                              <span>Passed</span>
-                              <div className="flex items-center gap-2">
-                                {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
-                                  const background =
-                                    passRatio === 1
-                                      ? "var(--color-success)"
-                                      : passRatio === 0
-                                        ? "var(--color-danger)"
-                                        : `linear-gradient(90deg, var(--color-success) ${Math.round(
-                                            passRatio * 100,
-                                          )}%, var(--color-danger) ${Math.round(
-                                            passRatio * 100,
-                                          )}%)`;
-                                  return (
-                                    <span
-                                      key={`pf-${index}`}
-                                      className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                      style={{ background }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                              <span>Failed</span>
+                <div
+                  className={`px-6 ${heatmapOpen ? "border-t border-[color:var(--color-border)] py-3" : "pt-0 pb-3"}`}
+                >
+                  {heatmapOpen ? (
+                    <>
+                      <div className="flex flex-wrap items-start justify-center gap-6 py-2">
+                        <div className="flex w-fit flex-wrap items-start gap-6">
+                          {dailyGrid.weeks.length === 0 ? (
+                            <div className="border border-dashed border-[color:var(--color-border)] p-6 text-sm text-[color:var(--color-text-muted)]">
+                              No completed goals yet. Mark a goal as passed or failed to see
+                              progress.
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span>Less</span>
-                              <div className="flex items-center gap-2">
-                                {[0, 0.35, 0.55, 0.75, 1].map((step) => (
+                          ) : (
+                            <div className="grid grid-cols-[auto_1fr] gap-3">
+                              <div
+                                className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[color:var(--color-text-muted)]"
+                                style={{ gridTemplateRows: "repeat(7, 12px)" }}
+                              >
+                                {["Mon", "Wed", "Fri"].map((day, index) => (
                                   <span
-                                    key={`legend-${step}`}
-                                    className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                    style={{
-                                      background:
-                                        step === 0
-                                          ? "var(--color-surface-subtle)"
-                                          : `linear-gradient(90deg, rgb(var(--color-success-rgb) / ${step}) 50%, rgb(var(--color-danger-rgb) / ${step}) 50%)`,
-                                  }}
-                                />
+                                    key={day}
+                                    className="flex h-4.5 items-end pb-[0px] leading-none"
+                                    style={{ gridRowStart: 2 + index * 2 }}
+                                  >
+                                    {day}
+                                  </span>
                                 ))}
                               </div>
-                              <span>More</span>
+                              <div className="w-fit max-w-full">
+                                <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[color:var(--color-text-muted)]">
+                                  {dailyGrid.monthLabels.map((label) => (
+                                    <span
+                                      key={`${label.index}-${label.label}`}
+                                      style={{ gridColumnStart: label.index + 1 }}
+                                    >
+                                      {label.label}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
+                                  {dailyGrid.weeks.map((week, weekIndex) => (
+                                    <div key={`week-${weekIndex}`} className="grid gap-[6px]">
+                                      {week.map((cell, dayIndex) => {
+                                        if (!cell) {
+                                          return (
+                                            <span
+                                              key={`empty-${weekIndex}-${dayIndex}`}
+                                              className="h-3 w-3 rounded-[4px]"
+                                            />
+                                          );
+                                        }
+                                        const total = cell.passCount + cell.failCount;
+                                        const passRatio = total > 0 ? cell.passCount / total : 0;
+                                        const intensity =
+                                          total === 0
+                                            ? 0
+                                            : Math.min(
+                                                1,
+                                                0.35 +
+                                                  total / Math.max(1, dailyGrid.maxTotal),
+                                              );
+                                        const green = `rgb(var(--color-success-rgb) / ${intensity})`;
+                                        const red = `rgb(var(--color-danger-rgb) / ${intensity})`;
+                                        const background =
+                                            total === 0
+                                              ? "var(--color-surface-subtle)"
+                                              : `linear-gradient(90deg, ${green} ${Math.round(
+                                                  passRatio * 100,
+                                                )}%, ${red} ${Math.round(
+                                                  passRatio * 100,
+                                                )}%)`;
+                                        return (
+                                          <span
+                                            key={cell.key}
+                                            className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
+                                            style={{ background }}
+                                            title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[color:var(--color-text-muted)]">
+                                  <div className="flex items-center gap-2">
+                                    <span>Passed</span>
+                                    <div className="flex items-center gap-2">
+                                      {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
+                                        const background =
+                                          passRatio === 1
+                                            ? "var(--color-success)"
+                                            : passRatio === 0
+                                              ? "var(--color-danger)"
+                                              : `linear-gradient(90deg, var(--color-success) ${Math.round(
+                                                  passRatio * 100,
+                                                )}%, var(--color-danger) ${Math.round(
+                                                  passRatio * 100,
+                                                )}%)`;
+                                        return (
+                                          <span
+                                            key={`pf-${index}`}
+                                            className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
+                                            style={{ background }}
+                                          />
+                                        );
+                                      })}
+                                    </div>
+                                    <span>Failed</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span>Less</span>
+                                    <div className="flex items-center gap-2">
+                                      {[0, 0.35, 0.55, 0.75, 1].map((step) => (
+                                        <span
+                                          key={`legend-${step}`}
+                                          className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
+                                          style={{
+                                            background:
+                                              step === 0
+                                                ? "var(--color-surface-subtle)"
+                                                : `linear-gradient(90deg, rgb(var(--color-success-rgb) / ${step}) 50%, rgb(var(--color-danger-rgb) / ${step}) 50%)`,
+                                        }}
+                                      />
+                                      ))}
+                                    </div>
+                                    <span>More</span>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          )}
+                        </div>
+                        <div className="flex items-start justify-end">
+                          <Select
+                            value={String(selectedYear)}
+                            onValueChange={(value) => setSelectedYear(Number(value))}
+                          >
+                            <SelectTrigger className="h-8 w-[88px] cursor-pointer justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
+                              <SelectValue placeholder="Year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableYears.map((year) => (
+                                <SelectItem key={year} value={String(year)}>
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                    )}
+                    </>
+                  ) : null}
+                  <div className="flex items-center justify-center border-t border-[color:var(--color-border)] pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setHeatmapOpen((open) => !open)}
+                      className={`flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-[10px] uppercase tracking-[0.2em] transition ${
+                        heatmapOpen
+                          ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
+                          : "border-[color:var(--color-border)] text-[color:var(--color-text-muted)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-text)]"
+                      }`}
+                      aria-label={heatmapOpen ? "Collapse heatmap" : "Show heatmap"}
+                    >
+                      <Activity className="h-4 w-4" />
+                      <span>Heatmap</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1314,7 +1363,7 @@ export default function Home() {
               </div>
               <Button
                 type="button"
-                onClick={closeEditGoal}
+                onClick={() => closeEditGoal()}
                 variant="outline"
                 className="rounded-full border-[color:var(--color-border)] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]"
               >
@@ -1434,7 +1483,7 @@ export default function Home() {
                 </Button>
                 <Button
                   type="button"
-                  onClick={closeEditGoal}
+                  onClick={() => closeEditGoal()}
                   disabled={editSaving || editDeleting}
                   variant="outline"
                   className="rounded-full border-[color:var(--color-border)] px-5 py-3 text-sm font-medium text-[color:var(--color-text-subtle)] transition hover:border-[color:var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"

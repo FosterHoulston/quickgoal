@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -22,62 +22,57 @@ export function UserSettingsProvider({ children }: UserSettingsProviderProps) {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsUserId, setSettingsUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!supabase) {
-      setAdsEnabledState(false);
-      setSettingsLoaded(true);
-      setSettingsUserId(null);
-      return;
-    }
+  const settingsAvailable = !!supabase && !!session;
 
-    if (!session) {
-      if (!authReady) return;
-      setAdsEnabledState(false);
-      setSettingsLoaded(true);
-      setSettingsUserId(null);
-      return;
-    }
+  useEffect(() => {
+    if (!settingsAvailable) return;
 
     if (settingsLoaded && settingsUserId === session.user.id) {
       return;
     }
 
     const loadSettings = async () => {
+      const client = supabase;
+      const activeSession = session;
+      if (!client || !activeSession) return;
       setSettingsLoaded(false);
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("user_settings")
         .select("ads_enabled")
-        .eq("user_id", session.user.id)
+        .eq("user_id", activeSession.user.id)
         .maybeSingle();
       if (error) {
         setAdsEnabledState(false);
-        setSettingsUserId(session.user.id);
+        setSettingsUserId(activeSession.user.id);
         setSettingsLoaded(true);
         return;
       }
       setAdsEnabledState(data?.ads_enabled ?? false);
-      setSettingsUserId(session.user.id);
+      setSettingsUserId(activeSession.user.id);
       setSettingsLoaded(true);
     };
 
     loadSettings();
-  }, [authReady, session, settingsLoaded, settingsUserId]);
+  }, [settingsAvailable, session, settingsLoaded, settingsUserId]);
 
-  const setAdsEnabled = async (nextValue: boolean) => {
+  const setAdsEnabled = useCallback(async (nextValue: boolean) => {
     setAdsEnabledState(nextValue);
     if (!supabase || !session) return;
     await supabase
       .from("user_settings")
       .upsert({ user_id: session.user.id, ads_enabled: nextValue }, { onConflict: "user_id" });
-  };
+  }, [session]);
+
+  const resolvedAdsEnabled = settingsAvailable ? adsEnabled : false;
+  const resolvedSettingsLoaded = settingsAvailable ? settingsLoaded : authReady;
 
   const value = useMemo(
     () => ({
-      adsEnabled,
-      settingsLoaded,
+      adsEnabled: resolvedAdsEnabled,
+      settingsLoaded: resolvedSettingsLoaded,
       setAdsEnabled,
     }),
-    [adsEnabled, settingsLoaded],
+    [resolvedAdsEnabled, resolvedSettingsLoaded, setAdsEnabled],
   );
 
   return (

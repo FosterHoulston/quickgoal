@@ -246,3 +246,19 @@ body {
 .toast-fade {
   animation: toast-in 200ms ease, toast-out 200ms ease 3.8s;
 }
+
+@keyframes tag-highlight {
+  0%,
+  65% {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent-soft);
+  }
+  100% {
+    border-color: var(--color-border);
+    background-color: var(--color-surface);
+  }
+}
+
+.tag-highlight {
+  animation: tag-highlight var(--tag-highlight-duration, 2400ms) ease;
+}
