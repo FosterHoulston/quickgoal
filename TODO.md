@@ -5,4 +5,5 @@
 - stlye: Fix light/dark tag and pass/fail pill button color inconsistencies (change dark mode) in goal creation form.
 - style: Heatmap shading needs to be adjusted with specific numbers of pass/fail submissions corresponding to specific opacity/shading per square.
 - refactor: Change the "Categories" sql columns to "tags".
-- perf: Optimize sql based on Supabase suggestions. 
+- perf: Optimize sql based on Supabase suggestions.
+- chore: Make landing/sign-in page only visible for initial sign-in or when no sign-in token exists. It should not be visilbe when already signed-in.
