@@ -7,3 +7,4 @@
 - refactor: Change the "Categories" sql columns to "tags".
 - perf: Optimize sql based on Supabase suggestions.
 - chore: Make landing/sign-in page only visible for initial sign-in or when no sign-in token exists. It should not be visilbe when already signed-in.
+- fix: Make heatmap shading based ONLY on when the user actually clicks Pass or Fail. If the user unclicks it, remove any corresponding shading levels.
