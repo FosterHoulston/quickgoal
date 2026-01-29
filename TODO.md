@@ -1,4 +1,4 @@
-- (CRITICAL) fix: create tag form doesn't close after creating a new tag now.
+- (CRITICAL) fix: create tag form doesn't close after creating a new tag by way of hitting the t key.
 - style: Make file tag dialog box close as soon as 'delete' button is pressed.
 - impr: Make calendar popup in goal creation form be selectable with cursor.
 - impr: Make tab keypress properly jump from form section to section in goal creation form.
