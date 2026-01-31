@@ -1,6 +1,9 @@
 # quickgoal
 Minimalist goal-tracking web app for fast goal capture.
 
+## v1.0 available now!
+<https://quickgoal.vercel.app>
+
 ## Product summary
 Quickgoal is a web app to capture goals with:
 - Automatic timestamping when the user starts typing a goal.
