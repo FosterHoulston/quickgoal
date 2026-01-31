@@ -213,7 +213,7 @@ function TagsPageContent() {
       pushToast("Sign in to create tags.", "error");
       return;
     }
-    setCreateOpen(false);
+    closeCreateDialog();
     const { data, error: insertError } = await supabase
       .from("categories")
       .insert({
@@ -276,6 +276,13 @@ function TagsPageContent() {
   const [editTag, setEditTag] = useState<Category | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
+  const closeCreateDialog = () => {
+    setCreateOpen(false);
+    if (createRequested) {
+      router.replace("/tags", { scroll: false });
+    }
+  };
 
   const openEdit = (tag: Category) => {
     setEditTag(tag);
@@ -372,10 +379,11 @@ function TagsPageContent() {
       <Dialog
         open={createOpen || createRequested}
         onOpenChange={(open) => {
-          setCreateOpen(open);
-          if (open && createRequested) {
-            router.replace("/tags", { scroll: false });
+          if (!open) {
+            closeCreateDialog();
+            return;
           }
+          setCreateOpen(true);
         }}
       >
         <DialogContent
@@ -416,7 +424,7 @@ function TagsPageContent() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setCreateOpen(false)}
+                onClick={closeCreateDialog}
                 className="rounded-full border-[color:var(--color-ink)] px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--color-text)]"
               >
                 Cancel
