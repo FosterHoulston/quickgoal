@@ -11,3 +11,4 @@
 - ci: Add github workflow ci/cd pipeline and protect main.
 - style: Integrate Tailwind CSS and setup shadcn CLI with the Tailwind V4 setup guide.
 - impr: Make the green checkmark and red x appear immediately after hitting the Pass/Fail button, but keep the toast notification timiing the same.
+- impr: Make scroll-to-top the default position for goals table (to activate upon new goal creations). If not scrolled to the top, hold current position and keep push-up behavior when selecting the heatmap.
