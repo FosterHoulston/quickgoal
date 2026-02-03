@@ -1,4 +1,3 @@
-- (CRITICAL) fix: create tag form doesn't close after creating a new tag by way of hitting the t key.
 - style: Make file tag dialog box close as soon as 'delete' button is pressed.
 - impr: Make calendar popup in goal creation form be selectable with cursor.
 - impr: Make tab keypress properly jump from form section to section in goal creation form.
@@ -12,3 +11,4 @@
 - style: Integrate Tailwind CSS and setup shadcn CLI with the Tailwind V4 setup guide.
 - impr: Make the green checkmark and red x appear immediately after hitting the Pass/Fail button, but keep the toast notification timiing the same.
 - impr: Make scroll-to-top the default position for goals table (to activate upon new goal creations). If not scrolled to the top, hold current position and keep push-up behavior when selecting the heatmap.
+- impr: When opening the Create Goal form, make the goal text field automatically selected first, (instead of the Close button).
