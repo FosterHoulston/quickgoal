@@ -1,4 +1,4 @@
-- fix: Make file tag dialog box close as soon as 'delete' button is pressed.
+- fix: Make file tag dialog box close as soon as 'delete' button is pressed. (Issue #2)
 - impr: Make calendar popup in goal creation form be selectable with cursor.
 - impr: Make tab keypress properly jump from form section to section in goal creation form.
 - stlye: Fix light/dark tag and pass/fail pill button color inconsistencies (change dark mode) in goal creation form.
