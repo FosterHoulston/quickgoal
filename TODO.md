@@ -5,10 +5,11 @@
 - style: Heatmap shading needs to be adjusted with specific numbers of pass/fail submissions corresponding to specific opacity/shading per square.
 - refactor: Change the "Categories" sql columns to "tags".
 - perf: Optimize sql based on Supabase suggestions.
-- chore: Make landing/sign-in page only visible for initial sign-in or when no sign-in token exists. It should not be visilbe when already signed-in.
+- chore: Make landing/sign-in page only visible for initial sign-in or when no sign-in token exists. It should not be visilbe when already signed-in. Replace with loading state screen.
 - fix: Make heatmap shading based ONLY on when the user actually clicks Pass or Fail. If the user unclicks it, remove any corresponding shading levels.
 - ci: Add github workflow ci/cd pipeline and protect main.
 - style: Integrate Tailwind CSS and setup shadcn CLI with the Tailwind V4 setup guide.
 - impr: Make the green checkmark and red x appear immediately after hitting the Pass/Fail button, but keep the toast notification timiing the same.
 - impr: Make scroll-to-top the default position for goals table (to activate upon new goal creations). If not scrolled to the top, hold current position and keep push-up behavior when selecting the heatmap.
 - impr: When opening the Create Goal form, make the goal text field automatically selected first, (instead of the Close button).
+- feat: Make the goal table filterable and make all incomplete goals automatically appear at the top of the table by default (will change when other column filters are selected).
