@@ -1557,11 +1557,6 @@ export default function Home() {
           showCloseButton={false}
           disableOutsidePointerEvents={false}
           className="w-full max-w-2xl rounded-3xl border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]"
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            handleSave();
-          }}
         >
           <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
             <div>
@@ -1615,6 +1610,7 @@ export default function Home() {
                 }
                 aria-pressed={hasEndAt}
                 disabled={!isAuthed}
+                tabIndex={0}
                 variant="outline"
                 className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                   hasEndAt
