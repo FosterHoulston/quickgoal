@@ -502,6 +502,81 @@ export default function Home() {
     tagButtonRefs.current[clamped]?.focus();
   };
 
+  const focusNearestTag = (direction: "left" | "right" | "up" | "down") => {
+    const elements = tagButtonRefs.current
+      .map((element, index) => {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          index,
+          left: rect.left,
+          top: rect.top,
+          centerX: rect.left + rect.width / 2,
+        };
+      })
+      .filter(
+        (item): item is { index: number; left: number; top: number; centerX: number } =>
+          item !== null,
+      );
+
+    if (!elements.length) return;
+
+    const rows: Array<{ top: number; items: typeof elements }> = [];
+    const rowTolerance = 4;
+
+    elements.forEach((item) => {
+      const row = rows.find((candidate) => Math.abs(candidate.top - item.top) <= rowTolerance);
+      if (row) {
+        row.items.push(item);
+      } else {
+        rows.push({ top: item.top, items: [item] });
+      }
+    });
+
+    rows.sort((a, b) => a.top - b.top);
+    rows.forEach((row) => row.items.sort((a, b) => a.left - b.left));
+
+    const currentRowIndex = rows.findIndex((row) =>
+      row.items.some((item) => item.index === focusedTagIndex),
+    );
+    if (currentRowIndex === -1) return;
+
+    const currentRow = rows[currentRowIndex];
+    const currentColIndex = currentRow.items.findIndex(
+      (item) => item.index === focusedTagIndex,
+    );
+    if (currentColIndex === -1) return;
+
+    if (direction === "left") {
+      if (currentColIndex > 0) focusTagAt(currentRow.items[currentColIndex - 1].index);
+      return;
+    }
+    if (direction === "right") {
+      if (currentColIndex < currentRow.items.length - 1) {
+        focusTagAt(currentRow.items[currentColIndex + 1].index);
+      }
+      return;
+    }
+
+    const targetRowIndex =
+      direction === "up" ? currentRowIndex - 1 : currentRowIndex + 1;
+    const targetRow = rows[targetRowIndex];
+    if (!targetRow) return;
+
+    const currentCenterX = currentRow.items[currentColIndex].centerX;
+    let best = targetRow.items[0];
+    let bestDistance = Math.abs(best.centerX - currentCenterX);
+    targetRow.items.forEach((item) => {
+      const distance = Math.abs(item.centerX - currentCenterX);
+      if (distance < bestDistance) {
+        best = item;
+        bestDistance = distance;
+      }
+    });
+
+    focusTagAt(best.index);
+  };
+
   const resetForm = () => {
     setTitle("");
     setDraftStartedAt(null);
@@ -1653,11 +1728,11 @@ export default function Home() {
                   }
                   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
                     event.preventDefault();
-                    focusTagAt(focusedTagIndex + 1);
+                    focusNearestTag(event.key === "ArrowRight" ? "right" : "down");
                   }
                   if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
                     event.preventDefault();
-                    focusTagAt(focusedTagIndex - 1);
+                    focusNearestTag(event.key === "ArrowLeft" ? "left" : "up");
                   }
                   if (event.key === "Home") {
                     event.preventDefault();
