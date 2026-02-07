@@ -1704,6 +1704,12 @@ export default function Home() {
                   type="datetime-local"
                   value={endAt}
                   onChange={(event) => setEndAt(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab" && !event.shiftKey) {
+                      event.preventDefault();
+                      focusTagAt(0);
+                    }
+                  }}
                   disabled={!isAuthed}
                   className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)] disabled:bg-[color:var(--color-surface-subtle)]"
                 />
