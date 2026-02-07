@@ -73,6 +73,9 @@ const hasEnded = (endAt?: string, now = Date.now()) => {
   return now >= endTime;
 };
 
+const getDefaultEndAtValue = () =>
+  toLocalInputValue(new Date(Date.now() + 60 * 60 * 1000).toISOString());
+
 type HeatmapCell = {
   key: string;
   label: string;
@@ -229,6 +232,10 @@ export default function Home() {
   const [editDeleting, setEditDeleting] = useState(false);
   const [clockTick, setClockTick] = useState(getNow);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const newGoalInputRef = useRef<HTMLInputElement | null>(null);
+  const tagButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const saveGoalButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [focusedTagIndex, setFocusedTagIndex] = useState(0);
 
   const isAuthed = !!session;
   const canSave = title.trim().length > 0 && isAuthed;
@@ -455,6 +462,13 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editGoal, newGoalOpen]);
 
+  useEffect(() => {
+    if (!newGoalOpen) return;
+    window.requestAnimationFrame(() => {
+      newGoalInputRef.current?.focus();
+    });
+  }, [newGoalOpen]);
+
   const handleTitleChange = (value: string) => {
     if (!draftStartedAt && value.trim().length > 0) {
       setDraftStartedAt(new Date());
@@ -468,6 +482,87 @@ export default function Home() {
         ? current.filter((item) => item !== categoryId)
         : [...current, categoryId],
     );
+  };
+
+  const focusTagAt = (index: number) => {
+    const clamped = Math.max(0, Math.min(categories.length - 1, index));
+    setFocusedTagIndex(clamped);
+    tagButtonRefs.current[clamped]?.focus();
+  };
+
+  const focusNearestTag = (direction: "left" | "right" | "up" | "down") => {
+    const elements = tagButtonRefs.current
+      .map((element, index) => {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          index,
+          left: rect.left,
+          top: rect.top,
+          centerX: rect.left + rect.width / 2,
+        };
+      })
+      .filter(
+        (item): item is { index: number; left: number; top: number; centerX: number } =>
+          item !== null,
+      );
+
+    if (!elements.length) return;
+
+    const rows: Array<{ top: number; items: typeof elements }> = [];
+    const rowTolerance = 4;
+
+    elements.forEach((item) => {
+      const row = rows.find((candidate) => Math.abs(candidate.top - item.top) <= rowTolerance);
+      if (row) {
+        row.items.push(item);
+      } else {
+        rows.push({ top: item.top, items: [item] });
+      }
+    });
+
+    rows.sort((a, b) => a.top - b.top);
+    rows.forEach((row) => row.items.sort((a, b) => a.left - b.left));
+
+    const currentRowIndex = rows.findIndex((row) =>
+      row.items.some((item) => item.index === focusedTagIndex),
+    );
+    if (currentRowIndex === -1) return;
+
+    const currentRow = rows[currentRowIndex];
+    const currentColIndex = currentRow.items.findIndex(
+      (item) => item.index === focusedTagIndex,
+    );
+    if (currentColIndex === -1) return;
+
+    if (direction === "left") {
+      if (currentColIndex > 0) focusTagAt(currentRow.items[currentColIndex - 1].index);
+      return;
+    }
+    if (direction === "right") {
+      if (currentColIndex < currentRow.items.length - 1) {
+        focusTagAt(currentRow.items[currentColIndex + 1].index);
+      }
+      return;
+    }
+
+    const targetRowIndex =
+      direction === "up" ? currentRowIndex - 1 : currentRowIndex + 1;
+    const targetRow = rows[targetRowIndex];
+    if (!targetRow) return;
+
+    const currentCenterX = currentRow.items[currentColIndex].centerX;
+    let best = targetRow.items[0];
+    let bestDistance = Math.abs(best.centerX - currentCenterX);
+    targetRow.items.forEach((item) => {
+      const distance = Math.abs(item.centerX - currentCenterX);
+      if (distance < bestDistance) {
+        best = item;
+        bestDistance = distance;
+      }
+    });
+
+    focusTagAt(best.index);
   };
 
   const resetForm = () => {
@@ -1354,6 +1449,7 @@ export default function Home() {
         {editGoal ? (
           <DialogContent
             showCloseButton={false}
+            disableOutsidePointerEvents={false}
             className="w-full max-w-2xl rounded-3xl border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]"
           >
             <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
@@ -1421,7 +1517,17 @@ export default function Home() {
               <div className="flex flex-col gap-3">
                   <Button
                     type="button"
-                    onClick={() => setEditHasEndAt((value) => !value)}
+                    onClick={() =>
+                      setEditHasEndAt((value) => {
+                        const next = !value;
+                        if (next) {
+                          setEditEndAt(getDefaultEndAtValue());
+                        } else {
+                          setEditEndAt("");
+                        }
+                        return next;
+                      })
+                    }
                     aria-pressed={editHasEndAt}
                     variant="outline"
                     className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
@@ -1509,16 +1615,15 @@ export default function Home() {
 
       <Dialog
         open={newGoalOpen}
-        onOpenChange={(open) => setNewGoalOpen(open)}
+        onOpenChange={(open) => {
+          setNewGoalOpen(open);
+          if (open) setFocusedTagIndex(0);
+        }}
       >
         <DialogContent
           showCloseButton={false}
+          disableOutsidePointerEvents={false}
           className="w-full max-w-2xl rounded-3xl border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5 shadow-[var(--shadow-modal)]"
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            event.preventDefault();
-            handleSave();
-          }}
         >
           <DialogHeader className="flex flex-row flex-wrap items-center justify-between gap-3 text-left">
             <div>
@@ -1547,6 +1652,7 @@ export default function Home() {
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">Goal</span>
               <Input
+                ref={newGoalInputRef}
                 value={title}
                 onChange={(event) => handleTitleChange(event.target.value)}
                 placeholder="Write a clear, short goal..."
@@ -1558,9 +1664,20 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <Button
                 type="button"
-                onClick={() => setHasEndAt((value) => !value)}
+                onClick={() =>
+                  setHasEndAt((value) => {
+                    const next = !value;
+                    if (next) {
+                      setEndAt(getDefaultEndAtValue());
+                    } else {
+                      setEndAt("");
+                    }
+                    return next;
+                  })
+                }
                 aria-pressed={hasEndAt}
                 disabled={!isAuthed}
+                tabIndex={0}
                 variant="outline"
                 className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
                   hasEndAt
@@ -1578,6 +1695,12 @@ export default function Home() {
                   type="datetime-local"
                   value={endAt}
                   onChange={(event) => setEndAt(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Tab" && !event.shiftKey) {
+                      event.preventDefault();
+                      focusTagAt(0);
+                    }
+                  }}
                   disabled={!isAuthed}
                   className="h-auto rounded-2xl border-[color:var(--color-ink-15)] bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm transition focus-visible:ring-[color:var(--color-ring-40)] disabled:bg-[color:var(--color-surface-subtle)]"
                 />
@@ -1588,16 +1711,54 @@ export default function Home() {
               <span className="text-sm font-medium text-[color:var(--color-text-subtle)]">
                 Categories
               </span>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => {
+              <div
+                className="flex flex-wrap gap-2"
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Goal categories"
+                onKeyDown={(event) => {
+                  if (!categories.length) return;
+                  if (event.key === "Tab" && !event.shiftKey) {
+                    event.preventDefault();
+                    saveGoalButtonRef.current?.focus();
+                    return;
+                  }
+                  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                    event.preventDefault();
+                    focusNearestTag(event.key === "ArrowRight" ? "right" : "down");
+                  }
+                  if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    focusNearestTag(event.key === "ArrowLeft" ? "left" : "up");
+                  }
+                  if (event.key === "Home") {
+                    event.preventDefault();
+                    focusTagAt(0);
+                  }
+                  if (event.key === "End") {
+                    event.preventDefault();
+                    focusTagAt(categories.length - 1);
+                  }
+                }}
+              >
+                {categories.map((category, index) => {
                   const selected = selectedCategories.includes(category.id);
+                  const clampedIndex = Math.min(
+                    focusedTagIndex,
+                    Math.max(categories.length - 1, 0),
+                  );
                   return (
                     <Button
                       key={category.id}
                       type="button"
                       onClick={() => toggleCategory(category.id)}
+                      onFocus={() => setFocusedTagIndex(index)}
                       aria-pressed={selected}
                       disabled={!isAuthed}
+                      tabIndex={index === clampedIndex ? 0 : -1}
+                      ref={(element) => {
+                        tagButtonRefs.current[index] = element;
+                      }}
                       variant="outline"
                       className={`h-auto rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition ${
                         selected
@@ -1617,6 +1778,7 @@ export default function Home() {
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
+                ref={saveGoalButtonRef}
                 className="rounded-full bg-[color:var(--color-button)] px-6 py-3 text-sm font-semibold text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-text-disabled)]"
               >
                 Save goal
