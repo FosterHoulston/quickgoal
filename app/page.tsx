@@ -469,18 +469,6 @@ export default function Home() {
     });
   }, [newGoalOpen]);
 
-  useEffect(() => {
-    if (!newGoalOpen) return;
-    setFocusedTagIndex(0);
-  }, [newGoalOpen]);
-
-  useEffect(() => {
-    if (!categories.length) return;
-    if (focusedTagIndex > categories.length - 1) {
-      setFocusedTagIndex(categories.length - 1);
-    }
-  }, [categories.length, focusedTagIndex]);
-
   const handleTitleChange = (value: string) => {
     if (!draftStartedAt && value.trim().length > 0) {
       setDraftStartedAt(new Date());
@@ -1627,7 +1615,10 @@ export default function Home() {
 
       <Dialog
         open={newGoalOpen}
-        onOpenChange={(open) => setNewGoalOpen(open)}
+        onOpenChange={(open) => {
+          setNewGoalOpen(open);
+          if (open) setFocusedTagIndex(0);
+        }}
       >
         <DialogContent
           showCloseButton={false}
@@ -1752,6 +1743,10 @@ export default function Home() {
               >
                 {categories.map((category, index) => {
                   const selected = selectedCategories.includes(category.id);
+                  const clampedIndex = Math.min(
+                    focusedTagIndex,
+                    Math.max(categories.length - 1, 0),
+                  );
                   return (
                     <Button
                       key={category.id}
@@ -1760,7 +1755,7 @@ export default function Home() {
                       onFocus={() => setFocusedTagIndex(index)}
                       aria-pressed={selected}
                       disabled={!isAuthed}
-                      tabIndex={index === focusedTagIndex ? 0 : -1}
+                      tabIndex={index === clampedIndex ? 0 : -1}
                       ref={(element) => {
                         tagButtonRefs.current[index] = element;
                       }}

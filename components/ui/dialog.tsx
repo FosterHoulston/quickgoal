@@ -53,6 +53,7 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  disableOutsidePointerEvents?: boolean
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
