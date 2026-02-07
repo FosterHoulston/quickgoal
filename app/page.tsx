@@ -234,6 +234,7 @@ export default function Home() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const newGoalInputRef = useRef<HTMLInputElement | null>(null);
   const tagButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const saveGoalButtonRef = useRef<HTMLButtonElement | null>(null);
   const [focusedTagIndex, setFocusedTagIndex] = useState(0);
 
   const isAuthed = !!session;
@@ -1645,6 +1646,11 @@ export default function Home() {
                 aria-label="Goal categories"
                 onKeyDown={(event) => {
                   if (!categories.length) return;
+                  if (event.key === "Tab" && !event.shiftKey) {
+                    event.preventDefault();
+                    saveGoalButtonRef.current?.focus();
+                    return;
+                  }
                   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
                     event.preventDefault();
                     focusTagAt(focusedTagIndex + 1);
@@ -1696,6 +1702,7 @@ export default function Home() {
                 type="button"
                 onClick={handleSave}
                 disabled={!canSave}
+                ref={saveGoalButtonRef}
                 className="rounded-full bg-[color:var(--color-button)] px-6 py-3 text-sm font-semibold text-[color:var(--color-button-text)] transition hover:bg-[color:var(--color-button-hover)] disabled:cursor-not-allowed disabled:bg-[color:var(--color-text-disabled)]"
               >
                 Save goal
