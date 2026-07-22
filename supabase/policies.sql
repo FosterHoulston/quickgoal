@@ -67,6 +67,7 @@ using (
 );
 
 alter table public.categories enable row level security;
+drop policy if exists categories_read_all on public.categories;
 drop policy if exists categories_read_own_or_default on public.categories;
 drop policy if exists categories_insert_own on public.categories;
 drop policy if exists categories_update_own on public.categories;
