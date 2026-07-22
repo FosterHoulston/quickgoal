@@ -1,12 +1,5 @@
 do $$
 begin
-  if not exists (select 1 from pg_type where typname = 'goal_term') then
-    create type goal_term as enum ('short', 'long');
-  end if;
-end $$;
-
-do $$
-begin
   if not exists (select 1 from pg_type where typname = 'goal_outcome') then
     create type goal_outcome as enum ('passed', 'failed');
   end if;
@@ -16,7 +9,6 @@ create table if not exists public.goals (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
-  term goal_term not null,
   outcome goal_outcome,
   created_at timestamptz not null default now(),
   end_at timestamptz
