@@ -32,7 +32,14 @@ import {
   toLocalInputValue,
 } from "@/lib/date";
 import { buildDailyGrid } from "@/lib/heatmap";
-import { DEFAULT_CATEGORIES, DEFAULT_TAG_SEED } from "@/lib/tags";
+import {
+  createGoal,
+  deleteGoal,
+  fetchGoals,
+  setGoalOutcome,
+  updateGoal,
+} from "@/lib/goals";
+import { DEFAULT_CATEGORIES, fetchTagsForUser } from "@/lib/tags";
 import { Activity } from "lucide-react";
 
 const HOVER_CARD_DELAY = 800;
@@ -120,56 +127,16 @@ export default function Home() {
     }
 
     const loadCategories = async () => {
-      if (!supabase || !session) return;
+      if (!session) return;
       setCategoriesLoaded(false);
-      const { data, error } = await supabase
-        .from("categories")
-        .select("id, name, description, user_id")
-        .eq("user_id", session.user.id)
-        .order("name");
-      if (error) {
+      const { data, error } = await fetchTagsForUser(session.user.id);
+
+      // No usable tags from the database — fall back to the built-in list so
+      // the picker still works, and flag it so we never write tag links.
+      if (error || !data || data.length === 0) {
         setCategories(DEFAULT_CATEGORIES);
         setCategoriesFromDb(false);
         setCategoriesUserId(null);
-        setCategoriesLoaded(true);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        const { data: defaults } = await supabase
-          .from("categories")
-          .select("name, description")
-          .is("user_id", null)
-          .order("name");
-
-        const seed =
-          defaults && defaults.length > 0 ? defaults : DEFAULT_TAG_SEED;
-
-        if (seed.length > 0) {
-          await supabase.from("categories").insert(
-            seed.map((item) => ({
-              user_id: session.user.id,
-              name: item.name,
-              description: item.description ?? null,
-            })),
-          );
-        }
-
-        const { data: reloaded } = await supabase
-          .from("categories")
-          .select("id, name, description, user_id")
-          .eq("user_id", session.user.id)
-          .order("name");
-        if (!reloaded || reloaded.length === 0) {
-          setCategories(DEFAULT_CATEGORIES);
-          setCategoriesFromDb(false);
-          setCategoriesUserId(null);
-          setCategoriesLoaded(true);
-          return;
-        }
-        setCategories(reloaded);
-        setCategoriesFromDb(true);
-        setCategoriesUserId(session.user.id);
         setCategoriesLoaded(true);
         return;
       }
@@ -215,47 +182,18 @@ export default function Home() {
     }
 
     const loadGoals = async () => {
-      if (!supabase || !session) return;
+      if (!session) return;
       setGoalsLoading(true);
       setGoalsLoaded(false);
       setGoalsError(null);
-      const { data, error } = await supabase
-        .from("goals")
-        .select(
-          "id, title, outcome, created_at, end_at, goal_categories(category_id, categories(name))",
-        )
-        .order("created_at", { ascending: false });
+      const { data, error } = await fetchGoals();
       if (error || !data) {
-        setGoalsError(error?.message ?? "Unable to load goals.");
+        setGoalsError(error ?? "Unable to load goals.");
         setGoalsLoading(false);
         setGoalsLoaded(true);
         return;
       }
-      const mapped: Goal[] = data.map((goal) => ({
-        id: goal.id,
-        title: goal.title,
-        outcome: goal.outcome ?? undefined,
-        createdAt: goal.created_at,
-        endAt: goal.end_at ?? undefined,
-        categoryIds: (goal.goal_categories ?? [])
-          .map((item) => item.category_id)
-          .filter((id): id is string => typeof id === "string"),
-        categories: (goal.goal_categories ?? [])
-          .map((item) => {
-            const categories = item.categories as
-              | { name?: string }
-              | { name?: string }[]
-              | null
-              | undefined;
-            if (!categories) return null;
-            if (Array.isArray(categories)) {
-              return categories[0]?.name ?? null;
-            }
-            return categories.name ?? null;
-          })
-          .filter((name): name is string => typeof name === "string"),
-      }));
-      setGoals(mapped);
+      setGoals(data);
       setGoalsLoading(false);
       setGoalsLoaded(true);
       setGoalsUserId(session.user.id);
@@ -428,54 +366,34 @@ export default function Home() {
     }
 
     const endAtValue = hasEndAt && endAt ? new Date(endAt).toISOString() : null;
-    const { data: savedGoal, error } = await supabase
-      .from("goals")
-      .insert({
-        user_id: session.user.id,
-        title: title.trim(),
-        created_at: createdAt,
-        end_at: endAtValue,
-      })
-      .select("id, title, outcome, created_at, end_at")
-      .single();
+    const { data: result, error } = await createGoal({
+      userId: session.user.id,
+      title: title.trim(),
+      createdAt,
+      endAt: endAtValue,
+      categoryIds: selectedCategories,
+      categoryNames: categories
+        .filter((category) => selectedCategories.includes(category.id))
+        .map((category) => category.name),
+      linkCategories: categoriesFromDb,
+    });
 
-    if (error || !savedGoal) {
-      setGoalsError(error?.message ?? "Unable to save goal.");
-      pushToast(error?.message ?? "Unable to save goal.", "error");
+    if (error || !result) {
+      setGoalsError(error ?? "Unable to save goal.");
+      pushToast(error ?? "Unable to save goal.", "error");
       return;
     }
 
-    if (categoriesFromDb && selectedCategories.length > 0) {
-      const { error: categoryError } = await supabase
-        .from("goal_categories")
-        .insert(
-          selectedCategories.map((categoryId) => ({
-            goal_id: savedGoal.id,
-            category_id: categoryId,
-          })),
-        );
-      if (categoryError) {
-        setGoalsError(categoryError.message);
-        pushToast(categoryError.message, "error");
-      }
-    }
-
-    const categoryNames = categories
-      .filter((category) => selectedCategories.includes(category.id))
-      .map((category) => category.name);
-
-    const newGoal: Goal = {
-      id: savedGoal.id,
-      title: savedGoal.title,
-      createdAt: savedGoal.created_at,
-      endAt: savedGoal.end_at ?? undefined,
-      categories: categoryNames,
-    };
-
-    setGoals((current) => [newGoal, ...current]);
+    setGoals((current) => [result.goal, ...current]);
     resetForm();
     setSaveNotice("Goal saved.");
-    pushToast("Goal created.", "success");
+
+    if (result.categoriesLinked) {
+      pushToast("Goal created.", "success");
+    } else {
+      setGoalsError(result.categoryError);
+      pushToast("Goal created, but its tags could not be saved.", "error");
+    }
   };
 
   const orderedGoals = useMemo(() => goals, [goals]);
@@ -513,13 +431,10 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase
-      .from("goals")
-      .update({ outcome: nextOutcome })
-      .eq("id", goalId);
+    const { error } = await setGoalOutcome(goalId, nextOutcome);
 
     if (error) {
-      setGoalsError(error.message);
+      setGoalsError(error);
       return;
     }
 
@@ -578,55 +493,27 @@ export default function Home() {
 
     const endAtValue = editHasEndAt && editEndAt ? new Date(editEndAt).toISOString() : null;
 
-    const { error } = await supabase
-      .from("goals")
-      .update({
-        title: editTitle.trim(),
-        outcome: editOutcome,
-        end_at: endAtValue,
-      })
-      .eq("id", editGoal.id);
+    const { data: result, error } = await updateGoal({
+      goalId: editGoal.id,
+      title: editTitle.trim(),
+      outcome: editOutcome,
+      endAt: endAtValue,
+      categoryIds: editSelectedCategories,
+      syncCategories: categoriesFromDb,
+    });
 
-    if (error) {
-      setGoalsError(error.message);
-      pushToast(error.message, "error");
+    if (error || !result) {
+      setGoalsError(error ?? "Unable to update goal.");
+      pushToast(error ?? "Unable to update goal.", "error");
       setEditSaving(false);
       return;
     }
 
-    if (categoriesFromDb) {
-      const { error: deleteError } = await supabase
-        .from("goal_categories")
-        .delete()
-        .eq("goal_id", editGoal.id);
-      if (deleteError) {
-        setGoalsError(deleteError.message);
-        pushToast(deleteError.message, "error");
-        setEditSaving(false);
-        return;
-      }
-
-      if (editSelectedCategories.length > 0) {
-        const { error: insertError } = await supabase
-          .from("goal_categories")
-          .insert(
-            editSelectedCategories.map((categoryId) => ({
-              goal_id: editGoal.id,
-              category_id: categoryId,
-            })),
-          );
-        if (insertError) {
-          setGoalsError(insertError.message);
-          pushToast(insertError.message, "error");
-          setEditSaving(false);
-          return;
-        }
-      }
-    }
-
-    const updatedCategoryNames = categories
-      .filter((category) => editSelectedCategories.includes(category.id))
-      .map((category) => category.name);
+    const updatedCategoryNames = result.categoriesLinked
+      ? categories
+          .filter((category) => editSelectedCategories.includes(category.id))
+          .map((category) => category.name)
+      : [];
 
     setGoals((current) =>
       current.map((goal) =>
@@ -637,14 +524,20 @@ export default function Home() {
               outcome: editOutcome ?? undefined,
               endAt: endAtValue ?? undefined,
               categories: updatedCategoryNames,
-              categoryIds: editSelectedCategories,
+              categoryIds: result.categoriesLinked ? editSelectedCategories : [],
             }
           : goal,
       ),
     );
 
     setEditSaving(false);
-    pushToast("Goal updated.", "success");
+
+    if (result.categoriesLinked) {
+      pushToast("Goal updated.", "success");
+    } else {
+      setGoalsError(result.categoryError);
+      pushToast("Goal updated, but its tags could not be saved.", "error");
+    }
   };
 
   const handleDeleteGoal = async () => {
@@ -654,10 +547,10 @@ export default function Home() {
     }
     setEditDeleting(true);
     setGoalsError(null);
-    const { error } = await supabase.from("goals").delete().eq("id", editGoal.id);
+    const { error } = await deleteGoal(editGoal.id);
     if (error) {
-      setGoalsError(error.message);
-      pushToast(error.message, "error");
+      setGoalsError(error);
+      pushToast(error, "error");
       setEditDeleting(false);
       return;
     }
