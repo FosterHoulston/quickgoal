@@ -16,16 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import type { Category } from "@/lib/types";
-
-const DEFAULT_TAGS = [
-  { name: "Health", description: null },
-  { name: "Career", description: null },
-  { name: "Learning", description: null },
-  { name: "Finance", description: null },
-  { name: "Relationships", description: null },
-  { name: "Mindset", description: null },
-  { name: "Creative", description: null },
-];
+import { DEFAULT_TAG_SEED, normalizeTag, toTagId } from "@/lib/tags";
 
 const TAG_HIGHLIGHT_DURATION = 2400;
 let toastIdCounter = 0;
@@ -36,13 +27,6 @@ const nextToastId = () => {
   toastIdCounter += 1;
   return `toast-${toastIdCounter}`;
 };
-
-const normalizeTag = (value: string) => value.trim().toLowerCase();
-
-const toTagId = (value: string) =>
-  normalizeTag(value)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
 
 function TagsPageContent() {
   const router = useRouter();
@@ -155,7 +139,8 @@ function TagsPageContent() {
           .is("user_id", null)
           .order("name");
 
-        const seed = defaults && defaults.length > 0 ? defaults : DEFAULT_TAGS;
+        const seed =
+          defaults && defaults.length > 0 ? defaults : DEFAULT_TAG_SEED;
 
         if (seed.length > 0) {
           await supabase.from("categories").insert(
