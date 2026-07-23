@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { useGoalData } from "@/components/GoalDataProvider";
+import { useToast } from "@/components/ToastProvider";
 import { supabase } from "@/lib/supabaseClient";
 import type { Goal } from "@/lib/types";
 import {
@@ -36,17 +37,10 @@ import { Activity } from "lucide-react";
 
 const HOVER_CARD_DELAY = 800;
 const getNow = () => Date.now();
-let toastIdCounter = 0;
-const nextToastId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  toastIdCounter += 1;
-  return `toast-${toastIdCounter}`;
-};
 
 export default function Home() {
   const { session, authReady } = useAuth();
+  const { pushToast } = useToast();
   const router = useRouter();
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
@@ -77,9 +71,6 @@ export default function Home() {
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
-  const [toasts, setToasts] = useState<
-    { id: string; message: string; tone?: "default" | "success" | "error" }[]
-  >([]);
   const [hoverCard, setHoverCard] = useState<{ id: string; top: number } | null>(
     null,
   );
@@ -105,17 +96,6 @@ export default function Home() {
 
   const isAuthed = !!session;
   const canSave = title.trim().length > 0 && isAuthed;
-
-  const pushToast = (
-    message: string,
-    tone: "default" | "success" | "error" = "default",
-  ) => {
-    const id = nextToastId();
-    setToasts((current) => [...current, { id, message, tone }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4000);
-  };
 
   useEffect(() => {
     if (!supabase) {
@@ -1668,23 +1648,6 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <div className="fixed bottom-6 right-6 z-50 flex w-[280px] flex-col gap-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`toast-fade rounded-2xl border px-4 py-3 text-xs shadow-lg ${
-              toast.tone === "success"
-                ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
-                : toast.tone === "error"
-                  ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
-                  : "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
-      </div>
     </>
   );
 }

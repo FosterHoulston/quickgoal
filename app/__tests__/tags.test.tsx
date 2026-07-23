@@ -2,6 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import TagsPage from "@/app/tags/page";
+import { ToastProvider } from "@/components/ToastProvider";
+
+const renderTagsPage = () =>
+  render(
+    <ToastProvider>
+      <TagsPage />
+    </ToastProvider>,
+  );
 
 const mockSearchParams = {
   get: (key: string) => (key === "highlight" ? "Health" : null),
@@ -49,7 +57,7 @@ vi.mock("@/lib/supabaseClient", () => ({ supabase: null }));
 describe("Tags page", () => {
   it("opens create dialog when create tag is clicked", async () => {
     const user = userEvent.setup();
-    render(<TagsPage />);
+    renderTagsPage();
 
     await user.click(screen.getByRole("button", { name: /create tag/i }));
     expect(await screen.findByPlaceholderText(/tag name/i)).toBeInTheDocument();
@@ -57,14 +65,14 @@ describe("Tags page", () => {
 
   it("opens edit dialog when a tag card is clicked", async () => {
     const user = userEvent.setup();
-    render(<TagsPage />);
+    renderTagsPage();
 
     await user.click(screen.getByRole("button", { name: /health/i }));
     expect(await screen.findByDisplayValue(/health/i)).toBeInTheDocument();
   });
 
   it("applies highlight class when navigated with highlight param", () => {
-    render(<TagsPage />);
+    renderTagsPage();
     const highlighted = screen.getByRole("button", { name: /health/i });
     expect(highlighted.className).toContain("tag-highlight");
   });

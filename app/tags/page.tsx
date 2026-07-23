@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/components/AuthProvider";
 import { useGoalData } from "@/components/GoalDataProvider";
+import { useToast } from "@/components/ToastProvider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,19 +20,12 @@ import type { Category } from "@/lib/types";
 import { DEFAULT_TAG_SEED, normalizeTag, toTagId } from "@/lib/tags";
 
 const TAG_HIGHLIGHT_DURATION = 2400;
-let toastIdCounter = 0;
-const nextToastId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  toastIdCounter += 1;
-  return `toast-${toastIdCounter}`;
-};
 
 function TagsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session } = useAuth();
+  const { pushToast } = useToast();
   const {
     categories,
     setCategories,
@@ -47,20 +41,6 @@ function TagsPageContent() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [toasts, setToasts] = useState<
-    { id: string; message: string; tone?: "default" | "success" | "error" }[]
-  >([]);
-
-  const pushToast = (
-    message: string,
-    tone: "default" | "success" | "error" = "default",
-  ) => {
-    const id = nextToastId();
-    setToasts((current) => [...current, { id, message, tone }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4000);
-  };
 
   const createParam = searchParams?.get("create");
   const highlightParam = searchParams?.get("highlight");
@@ -470,23 +450,6 @@ function TagsPageContent() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <div className="fixed bottom-6 right-6 z-50 flex w-[280px] flex-col gap-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`toast-fade rounded-2xl border px-4 py-3 text-xs shadow-lg ${
-              toast.tone === "success"
-                ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
-                : toast.tone === "error"
-                  ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
-                  : "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
-      </div>
     </AppShell>
   );
 }
