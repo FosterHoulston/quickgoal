@@ -3,6 +3,7 @@ import { Fraunces, Space_Grotesk } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import { GoalDataProvider } from "@/components/GoalDataProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/components/ToastProvider";
 import { UserSettingsProvider } from "@/components/UserSettingsProvider";
 import "./globals.css";
 
@@ -32,7 +33,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <UserSettingsProvider>
-              <GoalDataProvider>{children}</GoalDataProvider>
+              <GoalDataProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </GoalDataProvider>
             </UserSettingsProvider>
           </AuthProvider>
         </ThemeProvider>

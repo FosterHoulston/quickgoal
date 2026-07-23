@@ -2,6 +2,14 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import Home from "@/app/page";
+import { ToastProvider } from "@/components/ToastProvider";
+
+const renderHome = () =>
+  render(
+    <ToastProvider>
+      <Home />
+    </ToastProvider>,
+  );
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -61,7 +69,7 @@ vi.mock("@/components/GoalDataProvider", () => ({
 describe("Dashboard page", () => {
   it("disables save until a goal title is entered", async () => {
     const user = userEvent.setup();
-    render(<Home />);
+    renderHome();
 
     await user.click(screen.getByRole("button", { name: /create goal/i }));
     const saveButton = screen.getByRole("button", { name: /save goal/i });
@@ -74,7 +82,7 @@ describe("Dashboard page", () => {
 
   it("toggles heatmap visibility", async () => {
     const user = userEvent.setup();
-    render(<Home />);
+    renderHome();
 
     expect(screen.getByText(/passed/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /heatmap/i }));
@@ -85,7 +93,7 @@ describe("Dashboard page", () => {
 
   it("shows end date input when toggled on", async () => {
     const user = userEvent.setup();
-    render(<Home />);
+    renderHome();
 
     await user.click(screen.getByRole("button", { name: /create goal/i }));
     expect(document.querySelector('input[type="datetime-local"]')).toBeNull();
@@ -96,7 +104,7 @@ describe("Dashboard page", () => {
 
   it("opens edit dialog when a row is clicked", async () => {
     const user = userEvent.setup();
-    render(<Home />);
+    renderHome();
 
     await user.click(screen.getByRole("button", { name: /first goal/i }));
     expect(screen.getByText(/edit goal/i)).toBeInTheDocument();
@@ -105,7 +113,7 @@ describe("Dashboard page", () => {
 
   it("shows hover actions after delay", async () => {
     vi.useFakeTimers();
-    render(<Home />);
+    renderHome();
 
     const row = screen.getByRole("button", { name: /first goal/i });
 

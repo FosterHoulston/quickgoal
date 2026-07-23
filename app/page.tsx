@@ -22,165 +22,25 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { useGoalData } from "@/components/GoalDataProvider";
+import { useToast } from "@/components/ToastProvider";
 import { supabase } from "@/lib/supabaseClient";
-import type { Category, Goal } from "@/lib/types";
+import type { Goal } from "@/lib/types";
+import {
+  formatTimestamp,
+  getDefaultEndAtValue,
+  hasEnded,
+  toLocalInputValue,
+} from "@/lib/date";
+import { buildDailyGrid } from "@/lib/heatmap";
+import { DEFAULT_CATEGORIES, DEFAULT_TAG_SEED } from "@/lib/tags";
 import { Activity } from "lucide-react";
-
-const DEFAULT_CATEGORIES: Category[] = [
-  { id: "health", name: "Health" },
-  { id: "career", name: "Career" },
-  { id: "learning", name: "Learning" },
-  { id: "finance", name: "Finance" },
-  { id: "relationships", name: "Relationships" },
-  { id: "mindset", name: "Mindset" },
-  { id: "creative", name: "Creative" },
-];
 
 const HOVER_CARD_DELAY = 800;
 const getNow = () => Date.now();
-let toastIdCounter = 0;
-const nextToastId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  toastIdCounter += 1;
-  return `toast-${toastIdCounter}`;
-};
-
-const formatTimestamp = (value: Date | string) => {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-};
-
-const toLocalInputValue = (value?: string) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 16);
-};
-
-const hasEnded = (endAt?: string, now = Date.now()) => {
-  if (!endAt) return false;
-  const endTime = new Date(endAt).getTime();
-  if (Number.isNaN(endTime)) return false;
-  return now >= endTime;
-};
-
-const getDefaultEndAtValue = () =>
-  toLocalInputValue(new Date(Date.now() + 60 * 60 * 1000).toISOString());
-
-type HeatmapCell = {
-  key: string;
-  label: string;
-  passCount: number;
-  failCount: number;
-};
-
-const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
-
-const buildDailyGrid = (goals: Goal[], year: number) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const yearStart = new Date(year, 0, 1);
-  const yearEnd = new Date(year, 11, 31);
-  const start = new Date(yearStart);
-  start.setDate(start.getDate() - start.getDay());
-  const end = new Date(yearEnd);
-  end.setDate(end.getDate() + (6 - end.getDay()));
-
-  const days: HeatmapCell[] = [];
-  const map = new Map<string, HeatmapCell>();
-  goals.forEach((goal) => {
-    if (!goal.outcome) return;
-    const date = new Date(goal.createdAt);
-    if (Number.isNaN(date.getTime())) return;
-    if (date.getFullYear() !== year) return;
-    date.setHours(0, 0, 0, 0);
-    const key = formatDateKey(date);
-    const existing = map.get(key) ?? {
-      key,
-      label: date.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-      passCount: 0,
-      failCount: 0,
-    };
-    if (goal.outcome === "passed") {
-      existing.passCount += 1;
-    } else {
-      existing.failCount += 1;
-    }
-    map.set(key, existing);
-  });
-
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = formatDateKey(d);
-    days.push(
-      map.get(key) ?? {
-        key,
-        label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-        passCount: 0,
-        failCount: 0,
-      },
-    );
-  }
-
-  const weeks: (HeatmapCell | null)[][] = [];
-  const weekStartDates: Date[] = [];
-  const monthFirstWeekIndex = new Map<number, number>();
-  let maxTotal = 0;
-  days.forEach((cell, index) => {
-    const weekIndex = Math.floor(index / 7);
-    if (!weeks[weekIndex]) {
-      weeks[weekIndex] = [];
-      const weekStart = new Date(start);
-      weekStart.setDate(start.getDate() + weekIndex * 7);
-      weekStartDates[weekIndex] = weekStart;
-    }
-    weeks[weekIndex].push(cell);
-    const total = cell.passCount + cell.failCount;
-    if (total > maxTotal) maxTotal = total;
-
-    const date = new Date(cell.key);
-    if (date >= yearStart && date <= yearEnd && !monthFirstWeekIndex.has(date.getMonth())) {
-      monthFirstWeekIndex.set(date.getMonth(), weekIndex);
-    }
-  });
-
-  weeks.forEach((week) => {
-    week.forEach((cell, index) => {
-      if (!cell) return;
-      const date = new Date(cell.key);
-      if (date < yearStart || date > yearEnd) {
-        week[index] = null;
-      }
-    });
-  });
-
-  const monthLabels: { index: number; label: string }[] = [];
-  for (let month = 0; month < 12; month += 1) {
-    const monthStart = new Date(year, month, 1);
-    const monthEnd = new Date(year, month + 1, 0);
-    const weekIndex = weekStartDates.findIndex(
-      (date) => date >= monthStart && date <= monthEnd,
-    );
-    if (weekIndex === -1) continue;
-    monthLabels.push({
-      index: weekIndex,
-      label: monthStart.toLocaleDateString(undefined, { month: "short" }),
-    });
-  }
-
-  return { weeks, monthLabels, maxTotal };
-};
 
 export default function Home() {
   const { session, authReady } = useAuth();
+  const { pushToast } = useToast();
   const router = useRouter();
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
@@ -211,9 +71,6 @@ export default function Home() {
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
-  const [toasts, setToasts] = useState<
-    { id: string; message: string; tone?: "default" | "success" | "error" }[]
-  >([]);
   const [hoverCard, setHoverCard] = useState<{ id: string; top: number } | null>(
     null,
   );
@@ -239,17 +96,6 @@ export default function Home() {
 
   const isAuthed = !!session;
   const canSave = title.trim().length > 0 && isAuthed;
-
-  const pushToast = (
-    message: string,
-    tone: "default" | "success" | "error" = "default",
-  ) => {
-    const id = nextToastId();
-    setToasts((current) => [...current, { id, message, tone }]);
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
-    }, 4000);
-  };
 
   useEffect(() => {
     if (!supabase) {
@@ -296,12 +142,8 @@ export default function Home() {
           .is("user_id", null)
           .order("name");
 
-        const seed = (defaults && defaults.length > 0
-          ? defaults
-          : DEFAULT_CATEGORIES.map((category) => ({
-              name: category.name,
-              description: category.description ?? null,
-            })));
+        const seed =
+          defaults && defaults.length > 0 ? defaults : DEFAULT_TAG_SEED;
 
         if (seed.length > 0) {
           await supabase.from("categories").insert(
@@ -1806,23 +1648,6 @@ export default function Home() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <div className="fixed bottom-6 right-6 z-50 flex w-[280px] flex-col gap-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`toast-fade rounded-2xl border px-4 py-3 text-xs shadow-lg ${
-              toast.tone === "success"
-                ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
-                : toast.tone === "error"
-                  ? "border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] text-[color:var(--color-danger-strong)]"
-                  : "border-[color:var(--color-border)] bg-[color:var(--color-surface)] text-[color:var(--color-text-subtle)]"
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
-      </div>
     </>
   );
 }
