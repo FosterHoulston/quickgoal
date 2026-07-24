@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,23 +11,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/components/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { useGoalData } from "@/components/GoalDataProvider";
 import { useToast } from "@/components/ToastProvider";
+import { GoalHeatmap } from "@/components/goals/GoalHeatmap";
+import { GoalTable } from "@/components/goals/GoalTable";
 import { supabase } from "@/lib/supabaseClient";
 import type { Goal } from "@/lib/types";
 import {
   formatTimestamp,
   getDefaultEndAtValue,
-  hasEnded,
   toLocalInputValue,
 } from "@/lib/date";
 import { buildDailyGrid } from "@/lib/heatmap";
@@ -40,9 +33,7 @@ import {
   updateGoal,
 } from "@/lib/goals";
 import { DEFAULT_CATEGORIES, fetchTagsForUser } from "@/lib/tags";
-import { Activity } from "lucide-react";
 
-const HOVER_CARD_DELAY = 800;
 const getNow = () => Date.now();
 
 export default function Home() {
@@ -78,12 +69,6 @@ export default function Home() {
   const [goalsError, setGoalsError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
-  const [hoverCard, setHoverCard] = useState<{ id: string; top: number } | null>(
-    null,
-  );
-  const hoverTimeoutRef = useRef<number | null>(null);
-  const hoverHideTimeoutRef = useRef<number | null>(null);
-  const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editOutcome, setEditOutcome] = useState<"passed" | "failed" | null>(
@@ -415,15 +400,6 @@ export default function Home() {
     [orderedGoals, selectedYear],
   );
 
-  useEffect(() => {
-    if (!heatmapOpen) return;
-    const container = tableContainerRef.current;
-    if (!container) return;
-    window.requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-    });
-  }, [heatmapOpen, orderedGoals.length]);
-
   const handleOutcome = async (goalId: string, nextOutcome: "passed" | "failed") => {
     setGoalsError(null);
     if (!supabase || !session) {
@@ -622,36 +598,6 @@ export default function Home() {
     }
   };
 
-  const handleRowEnter = (goalId: string, target: HTMLTableRowElement) => {
-    if (hoverTimeoutRef.current) {
-      window.clearTimeout(hoverTimeoutRef.current);
-    }
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      const container = tableContainerRef.current;
-      if (container) {
-        const rowRect = target.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        const top = rowRect.top - containerRect.top;
-        setHoverCard({ id: goalId, top });
-      } else {
-        setHoverCard({ id: goalId, top: 0 });
-      }
-    }, HOVER_CARD_DELAY);
-  };
-
-  const handleRowLeave = () => {
-    if (hoverTimeoutRef.current) {
-      window.clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    if (hoverHideTimeoutRef.current) {
-      window.clearTimeout(hoverHideTimeoutRef.current);
-    }
-    hoverHideTimeoutRef.current = window.setTimeout(() => {
-      setHoverCard(null);
-    }, 150);
-  };
-
   const handleTagNavigate = (tag: string) => {
     const encoded = encodeURIComponent(tag);
     router.push(`/tags?highlight=${encoded}`);
@@ -775,401 +721,26 @@ export default function Home() {
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="flex min-h-0 flex-1 flex-col">
-                    {resolvedGoalsLoading ? (
-                      <div className="px-6 py-4 text-sm text-[color:var(--color-text-muted)]">
-                        Loading goals...
-                      </div>
-                    ) : orderedGoals.length === 0 ? (
-                      <div className="px-6 py-4 text-sm text-[color:var(--color-text-muted)]">
-                        {session
-                          ? "No goals yet. Use Create goal to add one."
-                          : "Sign in to view your goals."}
-                      </div>
-                    ) : (
-                    <div className="relative flex min-h-0 flex-1 flex-col">
-                      <div
-                        ref={tableContainerRef}
-                        className="min-h-0 flex-1 overflow-y-auto"
-                      >
-                        <table className="w-full table-fixed text-left text-sm">
-                        <thead className="sticky top-0 z-10 bg-[color:var(--color-surface-alt)] text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-text-muted)]">
-                          <tr>
-                            <th className="w-[40%] px-4 py-2.5 font-medium">Goal</th>
-                            <th className="w-[20%] px-4 py-2.5 font-medium">Start</th>
-                            <th className="w-[20%] px-4 py-2.5 font-medium">End</th>
-                            <th className="w-[20%] px-4 py-2.5 font-medium">
-                              Tags
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {orderedGoals.map((goal) => (
-                            <tr
-                              key={goal.id}
-                              role="button"
-                              tabIndex={isAuthed ? 0 : -1}
-                              onClick={() => {
-                                if (!isAuthed) return;
-                                openEditGoal(goal);
-                              }}
-                              onMouseEnter={(event) =>
-                                handleRowEnter(goal.id, event.currentTarget)
-                              }
-                              onMouseLeave={handleRowLeave}
-                              onKeyDown={(event) => {
-                                if (!isAuthed) return;
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault();
-                                  openEditGoal(goal);
-                                }
-                              }}
-                              aria-disabled={!isAuthed}
-                              className={`h-11 cursor-pointer border-t border-[color:var(--color-surface-subtle)] align-middle transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-ring-40)] ${
-                                goal.outcome === "passed"
-                                  ? "shadow-[inset_4px_0_0_0_var(--color-accent)] hover:bg-[color:var(--color-success-soft)]"
-                                  : goal.outcome === "failed"
-                                    ? "shadow-[inset_4px_0_0_0_var(--color-danger-strong)] hover:bg-[color:var(--color-danger-soft-2)]"
-                                    : "hover:bg-[color:var(--color-surface-muted)]"
-                              }`}
-                            >
-                              <td className="px-4 py-2 text-[color:var(--color-text)]">
-                                <div className="flex items-center gap-2 truncate font-semibold">
-                                  {goal.outcome === "passed" ? (
-                                    <span
-                                      className="text-[color:var(--color-accent)]"
-                                      aria-hidden="true"
-                                    >
-                                      ✓
-                                    </span>
-                                  ) : goal.outcome === "failed" ? (
-                                    <span
-                                      className="text-[color:var(--color-danger-strong)]"
-                                      aria-hidden="true"
-                                    >
-                                      x
-                                    </span>
-                                  ) : null}
-                                  <span className="truncate">{goal.title}</span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-2 text-xs text-[color:var(--color-text-muted)]">
-                                {formatTimestamp(goal.createdAt)}
-                              </td>
-                              <td className="px-4 py-2 text-xs text-[color:var(--color-text-muted)]">
-                                {goal.endAt ? (
-                                  <span className="truncate">
-                                    {formatTimestamp(goal.endAt)}
-                                  </span>
-                                ) : (
-                                  <span className="text-[color:var(--color-text-disabled)]">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-[10px] text-[color:var(--color-text-muted)]">
-                                {goal.categories.length > 0 ? (
-                                  <div className="flex items-center gap-1.5 truncate uppercase tracking-[0.16em]">
-                                    {goal.categories.slice(0, 2).map((category, index) => (
-                                      <span
-                                        key={`${goal.id}-${category}-${index}`}
-                                        className="truncate"
-                                      >
-                                        {category}
-                                      </span>
-                                    ))}
-                                    {goal.categories.length > 2 ? (
-                                      <span className="shrink-0">
-                                        +{goal.categories.length - 2}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                ) : (
-                                  <span className="uppercase tracking-[0.16em]">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        </table>
-                      </div>
-                      {hoverCard ? (
-                        <div
-                          className="pointer-events-auto absolute left-4 right-4 z-20"
-                          style={{ top: hoverCard.top + 6 }}
-                          onMouseEnter={() => {
-                            if (hoverHideTimeoutRef.current) {
-                              window.clearTimeout(hoverHideTimeoutRef.current);
-                              hoverHideTimeoutRef.current = null;
-                            }
-                          }}
-                          onMouseLeave={handleRowLeave}
-                        >
-                          {(() => {
-                            const goal = orderedGoals.find(
-                              (item) => item.id === hoverCard.id,
-                            );
-                            if (!goal) return null;
-                            return (
-                              <div
-                                role="presentation"
-                                onClick={() => {
-                                  if (!isAuthed) return;
-                                  openEditGoal(goal);
-                                }}
-                                className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4 shadow-xl"
-                              >
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <div className="text-sm font-semibold text-[color:var(--color-text)]">
-                                    {goal.title}
-                                  </div>
-                                  <div className="text-[11px] uppercase tracking-[0.18em] text-[color:var(--color-text-muted)]">
-                                    {goal.outcome
-                                      ? goal.outcome === "passed"
-                                        ? "Passed"
-                                        : "Failed"
-                                      : "Unscored"}
-                                  </div>
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-3 text-xs text-[color:var(--color-text-muted)]">
-                                  <span>Started {formatTimestamp(goal.createdAt)}</span>
-                                  {goal.endAt ? (
-                                    <span>
-                                      {hasEnded(goal.endAt, clockTick)
-                                        ? `Ended ${formatTimestamp(goal.endAt)}`
-                                        : `Ends ${formatTimestamp(goal.endAt)}`}
-                                    </span>
-                                  ) : (
-                                    <span>No end date</span>
-                                  )}
-                                </div>
-                                {goal.categories.length > 0 ? (
-                                  <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
-                                    {goal.categories.map((category, index) => (
-                                      <button
-                                        key={`${goal.id}-${category}-${index}`}
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          handleTagNavigate(category);
-                                        }}
-                                        className="cursor-pointer"
-                                      >
-                                        <Badge
-                                          variant="outline"
-                                          className="rounded-full border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-2 py-0.5 uppercase tracking-[0.16em] text-[color:var(--color-text-subtle)] transition hover:border-[color:var(--color-accent)]"
-                                        >
-                                          {category}
-                                        </Badge>
-                                      </button>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {!goal.outcome ? (
-                                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                                    <Button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleOutcome(goal.id, "passed");
-                                      }}
-                                      disabled={!isAuthed}
-                                      variant="outline"
-                                      className="h-auto rounded-full border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] px-3 py-1 uppercase tracking-[0.14em] text-[color:var(--color-accent)] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      Pass
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleOutcome(goal.id, "failed");
-                                      }}
-                                      disabled={!isAuthed}
-                                      variant="outline"
-                                      className="h-auto rounded-full border-[color:var(--color-danger-strong)] bg-[color:var(--color-danger-soft)] px-3 py-1 uppercase tracking-[0.14em] text-[color:var(--color-danger-strong)] transition disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      Fail
-                                    </Button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
+                <GoalTable
+                  goals={orderedGoals}
+                  loading={resolvedGoalsLoading}
+                  signedIn={!!session}
+                  isAuthed={isAuthed}
+                  clockTick={clockTick}
+                  scrollToBottomKey={heatmapOpen}
+                  onOpenGoal={openEditGoal}
+                  onOutcome={handleOutcome}
+                  onTagNavigate={handleTagNavigate}
+                />
 
-                <div
-                  className={`flex-shrink-0 px-6 ${
-                    heatmapOpen ? "border-t border-[color:var(--color-border)] py-3" : "pt-0 pb-3"
-                  }`}
-                >
-                  {heatmapOpen ? (
-                    <>
-                      <div className="flex flex-wrap items-start justify-center gap-6 py-2">
-                        <div className="flex w-fit flex-wrap items-start gap-6">
-                          {dailyGrid.weeks.length === 0 ? (
-                            <div className="border border-dashed border-[color:var(--color-border)] p-6 text-sm text-[color:var(--color-text-muted)]">
-                              No completed goals yet. Mark a goal as passed or failed to see
-                              progress.
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-[auto_1fr] gap-3">
-                              <div
-                                className="grid grid-rows-7 gap-[6px] pt-[18px] text-xs text-[color:var(--color-text-muted)]"
-                                style={{ gridTemplateRows: "repeat(7, 12px)" }}
-                              >
-                                {["Mon", "Wed", "Fri"].map((day, index) => (
-                                  <span
-                                    key={day}
-                                    className="flex h-4.5 items-end pb-[0px] leading-none"
-                                    style={{ gridRowStart: 2 + index * 2 }}
-                                  >
-                                    {day}
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="w-fit max-w-full">
-                                <div className="mb-2 grid auto-cols-[12px] grid-flow-col gap-[6px] text-xs text-[color:var(--color-text-muted)]">
-                                  {dailyGrid.monthLabels.map((label) => (
-                                    <span
-                                      key={`${label.index}-${label.label}`}
-                                      style={{ gridColumnStart: label.index + 1 }}
-                                    >
-                                      {label.label}
-                                    </span>
-                                  ))}
-                                </div>
-                                <div className="grid auto-cols-[12px] grid-flow-col gap-[6px]">
-                                  {dailyGrid.weeks.map((week, weekIndex) => (
-                                    <div key={`week-${weekIndex}`} className="grid gap-[6px]">
-                                      {week.map((cell, dayIndex) => {
-                                        if (!cell) {
-                                          return (
-                                            <span
-                                              key={`empty-${weekIndex}-${dayIndex}`}
-                                              className="h-3 w-3 rounded-[4px]"
-                                            />
-                                          );
-                                        }
-                                        const total = cell.passCount + cell.failCount;
-                                        const passRatio = total > 0 ? cell.passCount / total : 0;
-                                        const intensity =
-                                          total === 0
-                                            ? 0
-                                            : Math.min(
-                                                1,
-                                                0.35 +
-                                                  total / Math.max(1, dailyGrid.maxTotal),
-                                              );
-                                        const green = `rgb(var(--color-success-rgb) / ${intensity})`;
-                                        const red = `rgb(var(--color-danger-rgb) / ${intensity})`;
-                                        const background =
-                                            total === 0
-                                              ? "var(--color-surface-subtle)"
-                                              : `linear-gradient(90deg, ${green} ${Math.round(
-                                                  passRatio * 100,
-                                                )}%, ${red} ${Math.round(
-                                                  passRatio * 100,
-                                                )}%)`;
-                                        return (
-                                          <span
-                                            key={cell.key}
-                                            className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                            style={{ background }}
-                                            title={`${cell.label}: ${cell.passCount} passed, ${cell.failCount} failed`}
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-4 flex flex-wrap items-center justify-between gap-4 text-xs text-[color:var(--color-text-muted)]">
-                                  <div className="flex items-center gap-2">
-                                    <span>Passed</span>
-                                    <div className="flex items-center gap-2">
-                                      {[1, 0.6, 0.5, 0.4, 0].map((passRatio, index) => {
-                                        const background =
-                                          passRatio === 1
-                                            ? "var(--color-success)"
-                                            : passRatio === 0
-                                              ? "var(--color-danger)"
-                                              : `linear-gradient(90deg, var(--color-success) ${Math.round(
-                                                  passRatio * 100,
-                                                )}%, var(--color-danger) ${Math.round(
-                                                  passRatio * 100,
-                                                )}%)`;
-                                        return (
-                                          <span
-                                            key={`pf-${index}`}
-                                            className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                            style={{ background }}
-                                          />
-                                        );
-                                      })}
-                                    </div>
-                                    <span>Failed</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span>Less</span>
-                                    <div className="flex items-center gap-2">
-                                      {[0, 0.35, 0.55, 0.75, 1].map((step) => (
-                                        <span
-                                          key={`legend-${step}`}
-                                          className="h-3 w-3 rounded-[4px] border border-[color:var(--color-border)]"
-                                          style={{
-                                            background:
-                                              step === 0
-                                                ? "var(--color-surface-subtle)"
-                                                : `linear-gradient(90deg, rgb(var(--color-success-rgb) / ${step}) 50%, rgb(var(--color-danger-rgb) / ${step}) 50%)`,
-                                        }}
-                                      />
-                                      ))}
-                                    </div>
-                                    <span>More</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-start justify-end">
-                          <Select
-                            value={String(selectedYear)}
-                            onValueChange={(value) => setSelectedYear(Number(value))}
-                          >
-                            <SelectTrigger className="h-8 w-[88px] cursor-pointer justify-center rounded-full border-[color:var(--color-ink-20)] px-2 text-[10px] uppercase tracking-[0.2em]">
-                              <SelectValue placeholder="Year" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableYears.map((year) => (
-                                <SelectItem key={year} value={String(year)}>
-                                  {year}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
-                  <div className="flex items-center justify-center border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)] pt-3">
-                    <button
-                      type="button"
-                      onClick={() => setHeatmapOpen((open) => !open)}
-                      className={`flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-[10px] uppercase tracking-[0.2em] transition ${
-                        heatmapOpen
-                          ? "border-[color:var(--color-accent)] bg-[color:var(--color-accent-soft)] text-[color:var(--color-accent)]"
-                          : "border-[color:var(--color-border)] text-[color:var(--color-text-muted)] hover:border-[color:var(--color-accent)] hover:text-[color:var(--color-text)]"
-                      }`}
-                      aria-label={heatmapOpen ? "Collapse heatmap" : "Show heatmap"}
-                    >
-                      <Activity className="h-4 w-4" />
-                      <span>Heatmap</span>
-                    </button>
-                  </div>
-                </div>
+                <GoalHeatmap
+                  grid={dailyGrid}
+                  open={heatmapOpen}
+                  onToggle={() => setHeatmapOpen((open) => !open)}
+                  availableYears={availableYears}
+                  selectedYear={selectedYear}
+                  onYearChange={setSelectedYear}
+                />
               </div>
           </section>
         </AppShell>

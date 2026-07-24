@@ -7,9 +7,15 @@ export type HeatmapCell = {
   failCount: number;
 };
 
+export type DailyGrid = {
+  weeks: (HeatmapCell | null)[][];
+  monthLabels: { index: number; label: string }[];
+  maxTotal: number;
+};
+
 export const formatDateKey = (date: Date) => date.toISOString().slice(0, 10);
 
-export const buildDailyGrid = (goals: Goal[], year: number) => {
+export const buildDailyGrid = (goals: Goal[], year: number): DailyGrid => {
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31);
   const start = new Date(yearStart);
