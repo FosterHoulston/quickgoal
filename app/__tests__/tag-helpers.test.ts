@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// lib/tags also holds the Supabase-backed calls; the helpers under test are
+// pure, so stub the client rather than warning about missing env vars.
+vi.mock("@/lib/supabaseClient", () => ({ supabase: null }));
+
 import {
   DEFAULT_CATEGORIES,
   DEFAULT_TAG_NAMES,

@@ -17,7 +17,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabaseClient";
 import type { Category } from "@/lib/types";
-import { DEFAULT_TAG_SEED, normalizeTag, toTagId } from "@/lib/tags";
+import {
+  createTag,
+  deleteTag,
+  fetchTagsForUser,
+  normalizeTag,
+  toTagId,
+  updateTag,
+} from "@/lib/tags";
 
 const TAG_HIGHLIGHT_DURATION = 2400;
 
@@ -98,54 +105,17 @@ function TagsPageContent() {
       }
 
       setCategoriesLoaded(false);
-      const { data, error: loadError } = await supabase
-        .from("categories")
-        .select("id, name, description, user_id")
-        .eq("user_id", userId)
-        .order("name");
+      const { data, error: loadError } = await fetchTagsForUser(userId);
 
-      if (loadError) {
-        setError(loadError.message);
+      if (loadError || !data) {
+        setError(loadError ?? "Unable to load tags.");
         setLoading(false);
         setCategoriesFromDb(false);
         setCategoriesLoaded(true);
         return;
       }
 
-      if (!data || data.length === 0) {
-        const { data: defaults } = await supabase
-          .from("categories")
-          .select("name, description")
-          .is("user_id", null)
-          .order("name");
-
-        const seed =
-          defaults && defaults.length > 0 ? defaults : DEFAULT_TAG_SEED;
-
-        if (seed.length > 0) {
-          await supabase.from("categories").insert(
-            seed.map((item) => ({
-              user_id: userId,
-              name: item.name,
-              description: item.description ?? null,
-            })),
-          );
-        }
-
-        const { data: reloaded } = await supabase
-          .from("categories")
-          .select("id, name, description, user_id")
-          .eq("user_id", userId)
-          .order("name");
-        setCategories((reloaded ?? []) as Category[]);
-        setCategoriesFromDb(true);
-        setCategoriesUserId(userId);
-        setCategoriesLoaded(true);
-        setLoading(false);
-        return;
-      }
-
-      setCategories(data as Category[]);
+      setCategories(data);
       setCategoriesFromDb(true);
       setCategoriesUserId(userId);
       setCategoriesLoaded(true);
@@ -179,22 +149,18 @@ function TagsPageContent() {
       return;
     }
     closeCreateDialog();
-    const { data, error: insertError } = await supabase
-      .from("categories")
-      .insert({
-        user_id: userId,
-        name,
-        description: newDescription.trim() || null,
-      })
-      .select("id, name, description")
-      .single();
+    const { data, error: insertError } = await createTag({
+      userId,
+      name,
+      description: newDescription.trim() || null,
+    });
     if (insertError || !data) {
-      setError(insertError?.message ?? "Unable to create tag.");
-      pushToast(insertError?.message ?? "Unable to create tag.", "error");
+      setError(insertError ?? "Unable to create tag.");
+      pushToast(insertError ?? "Unable to create tag.", "error");
       return;
     }
     setCategories((current) =>
-      [...current, data as Category].sort((a, b) => a.name.localeCompare(b.name)),
+      [...current, data].sort((a, b) => a.name.localeCompare(b.name)),
     );
     setCategoriesFromDb(true);
     setNewName("");
@@ -205,16 +171,10 @@ function TagsPageContent() {
   const handleUpdate = async (tag: Category) => {
     if (!supabase) return;
     setError(null);
-    const { error: updateError } = await supabase
-      .from("categories")
-      .update({
-        name: tag.name.trim(),
-        description: tag.description?.trim() || null,
-      })
-      .eq("id", tag.id);
+    const { error: updateError } = await updateTag(tag);
     if (updateError) {
-      setError(updateError.message);
-      pushToast(updateError.message, "error");
+      setError(updateError);
+      pushToast(updateError, "error");
       return;
     }
     pushToast("Tag updated.", "success");
@@ -224,13 +184,10 @@ function TagsPageContent() {
     if (!supabase) return;
     if (!window.confirm("Delete this tag?")) return;
     setError(null);
-    const { error: deleteError } = await supabase
-      .from("categories")
-      .delete()
-      .eq("id", tagId);
+    const { error: deleteError } = await deleteTag(tagId);
     if (deleteError) {
-      setError(deleteError.message);
-      pushToast(deleteError.message, "error");
+      setError(deleteError);
+      pushToast(deleteError, "error");
       return;
     }
     setCategories((current) => current.filter((tag) => tag.id !== tagId));
