@@ -1,9 +1,9 @@
 # Troubleshooting Log
 
-A running record of problems we've hit on Quickgoal, what caused them, and how
-we resolved them. It exists so that recurring issues are recognized quickly,
-past decisions are traceable, and the reasoning behind a fix outlives the commit
-that made it.
+A running record of problems I've hit on Quickgoal, what caused them, and how I
+resolved them. It exists so that recurring issues are recognized quickly, past
+decisions are traceable, and the reasoning behind a fix outlives the commit that
+made it.
 
 ## How to use this file
 
@@ -27,9 +27,9 @@ that made it.
 - **Area:** <e.g. database / auth / dashboard / build / security / docs>
 - **Symptom:** What was observed — the visible failure or smell.
 - **Root cause:** Why it happened.
-- **Resolution:** What we changed to fix it.
+- **Resolution:** What I changed to fix it.
 - **Refs:** <commit> / PR #N / Issue #N
-- **Verification:** How we confirmed it was fixed (tests, build, manual check).
+- **Verification:** How I confirmed it was fixed (tests, build, manual check).
 ```
 
 Dates before 2026-07-22 are reconstructed from git history and commit messages,
@@ -114,7 +114,7 @@ here so the log is a complete picture of outstanding problems.
   only isolation mechanism because the anon key ships in the browser.
 - **Resolution:** Added `drop policy if exists categories_read_all` to
   `supabase/policies.sql`, leaving only the correct
-  `categories_read_own_or_default` rule. User ran the drop against production and
+  `categories_read_own_or_default` rule. I ran the drop against production and
   confirmed the table dropped from 5 policies to 4.
 - **Refs:** `7b394e2` / PR #9
 - **Verification:** Re-ran the policy count query in Supabase (4 policies); RLS
