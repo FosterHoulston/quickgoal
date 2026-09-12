@@ -128,6 +128,29 @@ here so the log is a complete picture of outstanding problems.
   fail against the old logic before the fix. Full suite 49/49 passing; `npm run
   lint` clean; `tsc --noEmit` clean apart from a pre-existing stale `.next/`
   artifact.
+### TS-014 — App unreachable after ~a week idle (Supabase free-tier auto-pause)
+- **Date:** 2026-07-24
+- **Status:** In progress (fix shipped; awaiting a real idle week to confirm)
+- **Area:** database / infrastructure
+- **Symptom:** After roughly a week with no one using the app, it became
+  inaccessible until I manually restored the project from the Supabase
+  dashboard.
+- **Root cause:** Supabase's free tier auto-pauses a project after 7 days with
+  no database activity. Site traffic alone doesn't reset that timer — only
+  something that actually queries the database does.
+- **Resolution:** Added a `/api/health` route (`app/api/health/route.ts`) that
+  runs a `head` count query against `categories` — it exercises the DB and
+  Supabase API without returning any rows, so it keeps the project awake while
+  leaking nothing. A Vercel Cron job (`vercel.json`) invokes it daily at 08:00
+  UTC. Daily rather than every few days for margin, since Hobby-tier cron timing
+  is approximate. Known constraints: Vercel Cron only fires on production
+  deployments, and Hobby tier caps crons at daily granularity (fine here).
+- **Refs:** branch `feat/db-keepalive`
+- **Verification:** `tsc`, ESLint, `next build` (route registered as `ƒ
+  /api/health`), and 44 Vitest tests all pass. Pending: after deploying to
+  production, hit `/api/health` and confirm a 200 + `{"status":"ok"}`, then
+  verify the app stays up through a genuine week of inactivity — at which point
+  flip this to Resolved.
 
 ### TS-013 — 1828-line dashboard monolith
 - **Date:** 2026-07-23
