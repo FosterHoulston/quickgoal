@@ -59,6 +59,35 @@ here so the log is a complete picture of outstanding problems.
 
 ## Resolved log
 
+### TS-014 — Goal table auto-scrolled to the bottom on every page load
+- **Date:** 2026-09-12
+- **Status:** Resolved (branch `hotfix/goal-table-default-scroll`)
+- **Area:** dashboard
+- **Symptom:** Loading the dashboard jumped the goal table straight to the
+  bottom of the list instead of leaving it at the top. It also re-scrolled to
+  the bottom whenever a goal was added or removed.
+- **Root cause:** The effect in `components/goals/GoalTable.tsx` existed only to
+  re-pin the table to the latest row when the heatmap is *opened* (opening it
+  shrinks the table's visible area). But it fired on any render where
+  `heatmapOpen` was true, and `heatmapOpen` is initialized to `true`
+  (`app/page.tsx`), so the condition was already satisfied on mount. `goals.length`
+  in the dependency array then re-fired it every time the list size changed —
+  including the async `0 → N` transition when goals first load, which is the
+  scroll that was actually visible. Introduced in `c8d0b96` and carried verbatim
+  into `GoalTable` by the `8946de6` extraction, so the trigger was never
+  re-examined after the default changed.
+- **Resolution:** Track the previous value in a ref and scroll only on a real
+  closed → open transition; dropped `goals.length` from the deps. Renamed the
+  prop `scrollToBottomKey` → `heatmapOpen`, since the old name described the
+  buggy "re-trigger on any change" behavior rather than the intent.
+- **Refs:** `components/goals/GoalTable.tsx`, `app/page.tsx`,
+  `app/__tests__/goal-table.test.tsx`
+- **Verification:** Added 5 regression tests covering mount, goals loading in,
+  a goal being added, opening the heatmap, and closing it. Confirmed 4 of the 5
+  fail against the old logic before the fix. Full suite 49/49 passing; `npm run
+  lint` clean; `tsc --noEmit` clean apart from a pre-existing stale `.next/`
+  artifact.
+
 ### TS-013 — 1828-line dashboard monolith
 - **Date:** 2026-07-23
 - **Status:** Resolved (merged to `main`, PR #12)
