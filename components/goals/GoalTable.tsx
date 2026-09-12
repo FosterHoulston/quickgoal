@@ -14,8 +14,13 @@ type GoalTableProps = {
   signedIn: boolean;
   isAuthed: boolean;
   clockTick: number;
-  /** Toggled by the heatmap; opening it scrolls the table to the latest row. */
-  scrollToBottomKey: boolean;
+  /**
+   * Whether the heatmap is open. Opening it shrinks the table, so the table
+   * re-pins to the latest row. Only a closed -> open transition scrolls: the
+   * heatmap starts open, and scrolling on mount or on every data change would
+   * yank the user to the bottom on page load and after each edit.
+   */
+  heatmapOpen: boolean;
   onOpenGoal: (goal: Goal) => void;
   onOutcome: (goalId: string, outcome: "passed" | "failed") => void;
   onTagNavigate: (tag: string) => void;
@@ -27,7 +32,7 @@ export function GoalTable({
   signedIn,
   isAuthed,
   clockTick,
-  scrollToBottomKey,
+  heatmapOpen,
   onOpenGoal,
   onOutcome,
   onTagNavigate,
@@ -38,15 +43,18 @@ export function GoalTable({
   const hoverTimeoutRef = useRef<number | null>(null);
   const hoverHideTimeoutRef = useRef<number | null>(null);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevHeatmapOpenRef = useRef(heatmapOpen);
 
   useEffect(() => {
-    if (!scrollToBottomKey) return;
+    const wasOpen = prevHeatmapOpenRef.current;
+    prevHeatmapOpenRef.current = heatmapOpen;
+    if (!heatmapOpen || wasOpen) return;
     const container = tableContainerRef.current;
     if (!container) return;
     window.requestAnimationFrame(() => {
       container.scrollTop = container.scrollHeight;
     });
-  }, [scrollToBottomKey, goals.length]);
+  }, [heatmapOpen]);
 
   // Clear any pending hover timers when the table unmounts.
   useEffect(

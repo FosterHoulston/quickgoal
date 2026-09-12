@@ -54,11 +54,80 @@ here so the log is a complete picture of outstanding problems.
 - **SQL/perf pass** based on Supabase advisor suggestions. *(TODO.md)*
 - **Filterable goals table** with incomplete goals floated to the top by default.
   *(TODO.md — feature, tracked here for completeness)*
+- **No git tags.** No release has ever been tagged, so no commit is reachable as
+  `v1.0.0`/`v1.0.1`. Backfill (`v1.0.1` → `0eb6fe2`; `v1.0.0` → `905cf78`, the
+  closest commit to the ship date) and tag going forward. Note tags do not travel
+  with a plain `git push`. *(from [TS-015](#ts-015--displayed-version-and-release-notes-drifted-from-the-real-release))*
+- **Stale `NEXT_PUBLIC_APP_VERSION`** still set to `v1.0.0` in `.env.local` and
+  possibly in the Vercel project settings. `next.config.ts` overrides it, so it is
+  harmless but misleading — delete it in both places. *(from TS-015)*
 
 ---
 
 ## Resolved log
 
+### TS-015 — Displayed version and release notes drifted from the real release
+- **Date:** 2026-09-12
+- **Status:** Resolved (branch `hotfix/goal-table-default-scroll`)
+- **Area:** build / docs
+- **Symptom:** The version badge in the bottom-left of the app read `v1.0.0`
+  while the deployed app was actually v1.0.1, and the release-notes dialog it
+  opens listed only v1.0.0. Separately, `package.json` still said `0.1.0` (the
+  Next.js scaffold default) and `CHANGELOG.md` had no v1.0.1 entry at all, so
+  nothing in the repo stated the released version correctly.
+- **Root cause:** The version lived in four hand-maintained places that nothing
+  forced to agree — `package.json`, `NEXT_PUBLIC_APP_VERSION` in `.env.local`
+  (plus Vercel), a hardcoded fallback in `components/AppShell.tsx`, and a
+  hardcoded `RELEASE_NOTES` array in that same file duplicating `CHANGELOG.md`.
+  Since `package.json` is unused by a `private` Vercel app, and no git tags were
+  ever cut, the v1.0.1 release (PR #6, `0eb6fe2`) shipped without any of them
+  being touched. The drift was invisible because each copy was individually
+  plausible.
+- **Resolution:** Made `package.json` the single source of truth. `next.config.ts`
+  now reads it plus `CHANGELOG.md` at build time and injects
+  `NEXT_PUBLIC_APP_VERSION` and `NEXT_PUBLIC_RELEASE_NOTES`; `AppShell` consumes
+  those instead of hardcoded values, and its fallback no longer names a version
+  (`"dev"`, which only shows outside a Next build). Added `lib/changelog.ts`, a
+  pure parser for the log's format. Backfilled the v1.0.1 changelog entry from
+  TS-005–TS-008 and added v1.0.2. Releasing is now: bump `package.json`, write
+  the changelog entry.
+- **Refs:** `next.config.ts`, `lib/changelog.ts`, `components/AppShell.tsx`,
+  `package.json`, `CHANGELOG.md`, `app/__tests__/changelog.test.ts`
+- **Verification:** Extracted the injected payload back out of the production
+  bundle and re-parsed it as the browser does — all three releases present with
+  correct dates and sections, embedded quotes and em dashes intact. Confirmed
+  `next.config.ts` overrides the stale `.env.local` value. 6 parser tests, one of
+  which parses the real `CHANGELOG.md` so a format change fails a test rather
+  than silently emptying the dialog. Suite 55/55; lint and `tsc --noEmit` clean.
+
+### TS-014 — Goal table auto-scrolled to the bottom on every page load
+- **Date:** 2026-09-12
+- **Status:** Resolved (branch `hotfix/goal-table-default-scroll`, released in v1.0.2)
+- **Area:** dashboard
+- **Symptom:** Loading the dashboard jumped the goal table straight to the
+  bottom of the list instead of leaving it at the top. It also re-scrolled to
+  the bottom whenever a goal was added or removed.
+- **Root cause:** The effect in `components/goals/GoalTable.tsx` existed only to
+  re-pin the table to the latest row when the heatmap is *opened* (opening it
+  shrinks the table's visible area). But it fired on any render where
+  `heatmapOpen` was true, and `heatmapOpen` is initialized to `true`
+  (`app/page.tsx`), so the condition was already satisfied on mount. `goals.length`
+  in the dependency array then re-fired it every time the list size changed —
+  including the async `0 → N` transition when goals first load, which is the
+  scroll that was actually visible. Introduced in `c8d0b96` and carried verbatim
+  into `GoalTable` by the `8946de6` extraction, so the trigger was never
+  re-examined after the default changed.
+- **Resolution:** Track the previous value in a ref and scroll only on a real
+  closed → open transition; dropped `goals.length` from the deps. Renamed the
+  prop `scrollToBottomKey` → `heatmapOpen`, since the old name described the
+  buggy "re-trigger on any change" behavior rather than the intent.
+- **Refs:** `components/goals/GoalTable.tsx`, `app/page.tsx`,
+  `app/__tests__/goal-table.test.tsx`
+- **Verification:** Added 5 regression tests covering mount, goals loading in,
+  a goal being added, opening the heatmap, and closing it. Confirmed 4 of the 5
+  fail against the old logic before the fix. Full suite 49/49 passing; `npm run
+  lint` clean; `tsc --noEmit` clean apart from a pre-existing stale `.next/`
+  artifact.
 ### TS-014 — App unreachable after ~a week idle (Supabase free-tier auto-pause)
 - **Date:** 2026-07-24
 - **Status:** In progress (fix shipped; awaiting a real idle week to confirm)

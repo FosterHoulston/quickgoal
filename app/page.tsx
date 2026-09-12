@@ -416,7 +416,7 @@ export default function Home() {
                   signedIn={!!session}
                   isAuthed={isAuthed}
                   clockTick={clockTick}
-                  scrollToBottomKey={heatmapOpen}
+                  heatmapOpen={heatmapOpen}
                   onOpenGoal={setEditGoal}
                   onOutcome={handleOutcome}
                   onTagNavigate={handleTagNavigate}

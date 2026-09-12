@@ -11,6 +11,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GitBranch, Github, Info, LayoutDashboard, Settings, Tag, User } from "lucide-react";
 import QuickgoalIcon from "@/app/quickgoal-icon";
+import type { Release } from "@/lib/changelog";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -26,29 +27,16 @@ const NAV_ITEMS = [
   { label: "About", icon: Info, href: "/about" },
 ];
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "v1.0.0";
+// Injected from package.json at build time by next.config.ts. The fallback only
+// shows outside a Next build (e.g. unit tests), so it must not name a version.
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 const APP_REPO_URL = process.env.NEXT_PUBLIC_APP_REPO_URL ?? "";
-const RELEASE_NOTES = [
-  {
-    version: "v1.0.0",
-    date: "Jan 26, 2026",
-    sections: [
-      {
-        title: "Features",
-        items: [
-          "Google sign-in with Supabase authentication.",
-          "Instant goal timestamps on first keystroke.",
-          "Optional end date toggle with datetime input.",
-          "Tag (category) multi-select and tags management.",
-          "Save goals to Supabase with recent-first sorting.",
-          "Editable goals with delete support.",
-          "Pass/fail outcomes with heatmap progress view.",
-          "Keyboard shortcuts for creating goals and tags.",
-        ],
-      },
-    ],
-  },
-];
+
+// Parsed from CHANGELOG.md at build time by next.config.ts, so the dialog can
+// never fall behind the log. Empty outside a Next build (e.g. unit tests).
+const RELEASE_NOTES: Release[] = JSON.parse(
+  process.env.NEXT_PUBLIC_RELEASE_NOTES ?? "[]",
+);
 
 export function AppShell({
   children,
